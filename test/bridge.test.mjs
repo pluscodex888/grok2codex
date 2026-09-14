@@ -213,3 +213,9 @@ test("unknown fingerprint disables tools while known handshake enables them", ()
   const accepted = negotiateCapabilities(handshake, [{ fingerprint: fp, adapter: "fixture-v1", requiredCapabilities: { supportsInputSchema: true } }]);
   assert.deepEqual(accepted, { enabled: true, mode: "tools", adapter: "fixture-v1", fingerprint: fp });
 });
+
+test("a text-only capability decision never advertises the Codex catalog", () => {
+  const bridge = createBridge({ capabilities: { enabled: false, mode: "text-only" }, tools, transport: { complete() {} }, executor: { execute() {} } });
+  assert.deepEqual(bridge.getToolDefinitions(), []);
+  assert.deepEqual(bridge.getProviderTools("responses"), []);
+});
