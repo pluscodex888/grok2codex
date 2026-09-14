@@ -161,10 +161,11 @@ test("end-to-end relay sends Grok tool call to the Codex executor and resumes", 
   await new Promise(resolve => upstream.listen(0, "127.0.0.1", resolve));
   const upstreamPort = upstream.address().port;
   let executions = 0;
+  let executionCallId = null;
   const bridge = createBridge({
     tools,
     transport: createOpenAITransport({ baseUrl: `http://127.0.0.1:${upstreamPort}` }),
-    executor: { async execute(tool, args) { executions += 1; return { tool: tool.stableId, path: args.path, ok: true }; } },
+    executor: { async execute(tool, args, context) { executions += 1; executionCallId = context.callId; return { tool: tool.stableId, path: args.path, ok: true }; } },
   });
   const relay = createBridgeServer({ bridge, port: 0 });
   const address = await relay.listen();
@@ -176,6 +177,7 @@ test("end-to-end relay sends Grok tool call to the Codex executor and resumes", 
     assert.equal(response.status, 200);
     assert.equal((await response.json()).id, "grok-final");
     assert.equal(executions, 1);
+    assert.equal(executionCallId, "call-1");
     assert.equal(upstreamRequests.length, 2);
     assert.equal(upstreamRequests[1].previous_response_id, "grok-call");
     assert.equal(upstreamRequests[1].input[0].call_id, "call-1");
