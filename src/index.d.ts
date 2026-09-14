@@ -43,3 +43,5 @@ export function createJsonRpcSocketClient(options: { socket?: JsonRpcSocket; con
 export function createSocketExecutor(options: { rpc: { request(method: string, params?: unknown, signal?: AbortSignal): Promise<any> }; method?: string }): BridgeExecutor;
 export function createEnhancedDesktopRelay(options: GrokCodexRelayOptions & { enabled?: boolean | ((model?: string) => boolean); onStateChange?(event: { bridgeCallId: string; vendorCallId: string; state: string; [key: string]: unknown }): void }): ReturnType<typeof createGrokCodexRelay> & { enabled: boolean; disabledReason?: "non_grok_model" | "disabled_in_settings" };
 export function isGrokModel(model: unknown): boolean;
+export function createResponsesToolCodec(request: Record<string, any>): { request: Record<string, any>; restore(response: Record<string, any>): Record<string, any> };
+export function createClientToolPassthrough(options: { transport: Pick<BridgeTransport, "complete">; onResponse?(event: { calls: Array<{ type: string; name: string; namespace?: string; callId: string }> }): void }): { runTurn(options: RunTurnOptions): Promise<any> };

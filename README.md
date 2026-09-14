@@ -12,6 +12,19 @@ The bridge only performs name mapping, schema checks, policy checks, call/result
 
 ## Minimal usage
 
+If Codex already owns the model/tool loop, use `createClientToolPassthrough`
+with `createOpenAITransport` and the optional `createBridgeServer` instead.
+It translates namespaced functions and custom text tools for a function-only
+provider, then restores call IDs, names, namespaces, and raw custom inputs for
+Codex to execute. Each request makes exactly one upstream call. The next client
+request retains the full task history and tool outputs. No executor is created
+by this mode; approvals, sandboxing, MCP, and cancellation remain in Codex.
+Do not connect the general Codex catalog to a shell-only executor.
+
+The custom-tool conversion follows the public [Responses custom tool protocol](https://developers.openai.com/api/docs/guides/function-calling#custom-tools).
+The provider cannot enforce the original grammar during generation in this
+mode; the original client validates the restored input.
+
 ```js
 import { createBridge } from "@grok2codex/client-bridge";
 
