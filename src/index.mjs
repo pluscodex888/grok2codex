@@ -312,11 +312,14 @@ class ToolBridge {
   async runTurn({ protocol = "responses", request, context, signal }) {
     if (protocol !== "responses" && protocol !== "chat") throw new BridgeError("protocol", `unsupported protocol: ${protocol}`);
     let current = this.prepareRequest(protocol, request);
+    let totalToolCalls = 0;
     for (let turn = 0; turn < this.maxTurns; turn += 1) {
       const response = await this.transport.complete({ protocol, request: current, tools: this.getToolDefinitions() }, signal);
       const calls = extractCalls(protocol, response);
       if (!calls.length) return response;
       if (!response?.id && protocol === "responses") throw new BridgeError("continuation", "Responses tool call is missing response id");
+      totalToolCalls += calls.length;
+      if (totalToolCalls > this.maxToolCalls) throw new BridgeError("tool_limit", `tool call count exceeds ${this.maxToolCalls}`);
       const results = await this.executeCalls(calls, { ...(context || {}), signal });
       current = { ...current, ...continuation(protocol, response, results) };
     }
