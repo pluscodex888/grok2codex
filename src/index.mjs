@@ -282,18 +282,19 @@ class ToolBridge {
       };
       state("DISCOVERED", { wireName: call.wireName });
       try {
+        const executionContext = { ...(context || {}), callId: call.vendorCallId, bridgeCallId };
         const { definition, argumentsValue } = this._resolve(call);
         const errors = validateSchema(argumentsValue, definition.inputSchema);
         if (errors.length) throw new BridgeError("invalid_arguments", errors.join("; "));
         state("VALIDATED", { stableId: definition.stableId });
         if (this.policy.allowTool) {
           state("APPROVAL_PENDING", { stableId: definition.stableId });
-          if (!await this.policy.allowTool(definition, argumentsValue, context)) {
+          if (!await this.policy.allowTool(definition, argumentsValue, executionContext)) {
             throw new BridgeError("permission_denied", `tool denied: ${definition.stableId}`);
           }
         }
         state("EXECUTING", { stableId: definition.stableId });
-        const output = await this.executor.execute(definition, argumentsValue, context);
+        const output = await this.executor.execute(definition, argumentsValue, executionContext);
         const outputJson = typeof output === "string" ? output : json(output, "tool output");
         if (Buffer.byteLength(outputJson, "utf8") > this.maxToolOutputBytes) {
           throw new BridgeError("tool_output_limit", `tool output exceeds ${this.maxToolOutputBytes} bytes`);
