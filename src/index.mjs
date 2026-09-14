@@ -1,4 +1,5 @@
 const SAFE_NAME = /^[A-Za-z0-9_-]+$/;
+let bridgeCallSequence = 0;
 
 export class BridgeError extends Error {
   constructor(code, message, details = {}) {
@@ -45,7 +46,13 @@ export function providerToolsToDefinitions(protocol, providerTools, { source = "
       source,
     });
   };
-  for (const item of providerTools || []) visit(item, namespace);
+  const list = Array.isArray(providerTools)
+    ? providerTools
+    : [
+        ...(Array.isArray(providerTools?.tools) ? providerTools.tools : []),
+        ...(Array.isArray(providerTools?.additional_tools) ? providerTools.additional_tools : []),
+      ];
+  for (const item of list) visit(item, namespace);
   return definitions;
 }
 
@@ -142,6 +149,10 @@ class ToolBridge {
     this.executor = options.executor;
     this.policy = options.policy || {};
     this.maxAdvertisedTools = options.maxAdvertisedTools ?? 180;
+    this.maxToolCalls = options.maxToolCalls ?? 32;
+    this.maxToolOutputBytes = options.maxToolOutputBytes ?? 2 * 1024 * 1024;
+    this.maxTurns = options.maxTurns ?? 8;
+    this.onStateChange = typeof options.onStateChange === "function" ? options.onStateChange : null;
     this.tools = new Map();
     this._setTools(options.tools || []);
   }
@@ -232,38 +243,59 @@ class ToolBridge {
   }
 
   async executeCalls(calls, context = {}) {
-    const results = [];
-    for (const call of calls) {
+    if (calls.length > this.maxToolCalls) {
+      throw new BridgeError("tool_limit", `tool call count exceeds ${this.maxToolCalls}`);
+    }
+    const executeOne = async (call, index) => {
+      const bridgeCallId = `bridge_${Date.now().toString(36)}_${(++bridgeCallSequence).toString(36)}_${index.toString(36)}`;
+      const state = (name, details = {}) => {
+        try { this.onStateChange?.({ bridgeCallId, vendorCallId: call.vendorCallId, state: name, ...details }); } catch { /* diagnostics cannot break a turn */ }
+      };
+      state("DISCOVERED", { wireName: call.wireName });
       try {
         const { definition, argumentsValue } = this._resolve(call);
         const errors = validateSchema(argumentsValue, definition.inputSchema);
         if (errors.length) throw new BridgeError("invalid_arguments", errors.join("; "));
-        if (this.policy.allowTool && !await this.policy.allowTool(definition, argumentsValue, context)) {
-          throw new BridgeError("permission_denied", `tool denied: ${definition.stableId}`);
+        state("VALIDATED", { stableId: definition.stableId });
+        if (this.policy.allowTool) {
+          state("APPROVAL_PENDING", { stableId: definition.stableId });
+          if (!await this.policy.allowTool(definition, argumentsValue, context)) {
+            throw new BridgeError("permission_denied", `tool denied: ${definition.stableId}`);
+          }
         }
+        state("EXECUTING", { stableId: definition.stableId });
         const output = await this.executor.execute(definition, argumentsValue, context);
-        results.push({ vendorCallId: call.vendorCallId, ok: true, outputJson: typeof output === "string" ? output : json(output, "tool output") });
+        const outputJson = typeof output === "string" ? output : json(output, "tool output");
+        if (Buffer.byteLength(outputJson, "utf8") > this.maxToolOutputBytes) {
+          throw new BridgeError("tool_output_limit", `tool output exceeds ${this.maxToolOutputBytes} bytes`);
+        }
+        state("RESULT_READY", { stableId: definition.stableId, outputBytes: Buffer.byteLength(outputJson, "utf8") });
+        return { vendorCallId: call.vendorCallId, ok: true, outputJson };
       } catch (error) {
         const bridgeError = error instanceof BridgeError ? error : new BridgeError("internal_error", String(error));
-        results.push({ vendorCallId: call.vendorCallId, ok: false, outputJson: JSON.stringify({ error: bridgeError.code, message: bridgeError.message }), errorCode: bridgeError.code });
+        state("REJECTED", { errorCode: bridgeError.code });
+        return { vendorCallId: call.vendorCallId, ok: false, outputJson: JSON.stringify({ error: bridgeError.code, message: bridgeError.message }), errorCode: bridgeError.code };
       }
-    }
-    return results;
+    };
+    return Promise.all(calls.map(executeOne));
   }
 
   async runTurn({ protocol = "responses", request, context, signal }) {
     if (protocol !== "responses" && protocol !== "chat") throw new BridgeError("protocol", `unsupported protocol: ${protocol}`);
     let current = this.prepareRequest(protocol, request);
-    for (;;) {
+    for (let turn = 0; turn < this.maxTurns; turn += 1) {
       const response = await this.transport.complete({ protocol, request: current, tools: this.getToolDefinitions() }, signal);
       const calls = extractCalls(protocol, response);
       if (!calls.length) return response;
-      const results = await this.executeCalls(calls, context);
+      if (!response?.id && protocol === "responses") throw new BridgeError("continuation", "Responses tool call is missing response id");
+      const results = await this.executeCalls(calls, { ...(context || {}), signal });
       current = { ...current, ...continuation(protocol, response, results) };
     }
+    throw new BridgeError("turn_limit", `tool continuation exceeds ${this.maxTurns} turns`);
   }
 }
 
 export { createOpenAITransport } from "./http.mjs";
 export { createBridgeServer } from "./server.mjs";
 export { createCodexExecutor } from "./codex.mjs";
+export { createHandshake, fingerprint, negotiateCapabilities } from "./capabilities.mjs";

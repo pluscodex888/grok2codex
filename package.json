@@ -19,6 +19,10 @@
     "./codex": {
       "types": "./src/index.d.ts",
       "import": "./src/codex.mjs"
+    },
+    "./capabilities": {
+      "types": "./src/index.d.ts",
+      "import": "./src/capabilities.mjs"
     }
   },
   "files": ["src", "README.md", "LICENSE"],

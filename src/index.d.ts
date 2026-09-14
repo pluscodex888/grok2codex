@@ -1,6 +1,6 @@
 export type Protocol = "responses" | "chat";
 export type ToolSource = "codex" | "mcp" | "bridge";
-export type BridgeErrorCode = "configuration" | "protocol" | "tool_collision" | "unknown_tool" | "invalid_arguments" | "permission_denied" | "internal_error" | "upstream" | "timeout" | "invalid_request" | "request_too_large";
+export type BridgeErrorCode = "configuration" | "protocol" | "tool_collision" | "unknown_tool" | "invalid_arguments" | "permission_denied" | "internal_error" | "upstream" | "timeout" | "invalid_request" | "request_too_large" | "tool_limit" | "tool_output_limit" | "continuation" | "turn_limit" | "handshake";
 
 export interface JsonSchema { type?: string; required?: string[]; properties?: Record<string, JsonSchema>; items?: JsonSchema; [key: string]: unknown; }
 export interface ToolDefinition {
@@ -18,7 +18,7 @@ export interface ToolResult { vendorCallId: string; ok: boolean; outputJson: str
 export interface BridgeTransport { complete(input: { protocol: Protocol; request: unknown; tools: ToolDefinition[] }, signal?: AbortSignal): Promise<any>; }
 export interface BridgeExecutor { execute(tool: ToolDefinition, argumentsValue: unknown, context?: unknown): Promise<unknown>; }
 export interface BridgePolicy { allowTool?(tool: ToolDefinition, argumentsValue: unknown, context?: unknown): boolean | Promise<boolean>; }
-export interface BridgeOptions { transport: BridgeTransport; executor: BridgeExecutor; tools?: ToolDefinition[]; policy?: BridgePolicy; maxAdvertisedTools?: number; }
+export interface BridgeOptions { transport: BridgeTransport; executor: BridgeExecutor; tools?: ToolDefinition[]; policy?: BridgePolicy; maxAdvertisedTools?: number; maxToolCalls?: number; maxToolOutputBytes?: number; maxTurns?: number; onStateChange?(event: { bridgeCallId: string; vendorCallId: string; state: string; [key: string]: unknown }): void; }
 export interface RunTurnOptions { protocol?: Protocol; request: unknown; context?: unknown; signal?: AbortSignal; }
 export class BridgeError extends Error { code: BridgeErrorCode; details: Record<string, unknown>; }
 export function createBridge(options: BridgeOptions): { getToolDefinitions(): ToolDefinition[]; getProviderTools(protocol?: Protocol): unknown[]; prepareRequest(protocol: Protocol, request: unknown): any; executeCalls(calls: ToolCall[], context?: unknown): Promise<ToolResult[]>; setTools(definitions: ToolDefinition[]): unknown; runTurn(options: RunTurnOptions): Promise<any>; };
@@ -30,3 +30,9 @@ export interface BridgeServerOptions { bridge: ReturnType<typeof createBridge>; 
 export function createBridgeServer(options: BridgeServerOptions): { server: import("node:http").Server; listen(): Promise<{ host: string; port: number }>; close(): Promise<void>; };
 export interface CodexExecutorOptions { invoke(input: { tool: ToolDefinition; arguments: unknown; context: unknown; correlation: { callId: string | null; threadId: string | null; turnId: string | null } }): unknown | Promise<unknown>; onResult?(input: { tool: ToolDefinition; arguments: unknown; output: unknown; context: unknown; correlation: { callId: string | null; threadId: string | null; turnId: string | null } }): unknown | Promise<unknown>; }
 export function createCodexExecutor(options: CodexExecutorOptions): BridgeExecutor;
+export interface CodexCapabilities { appServerProtocol?: string; cliVersion?: string; fingerprint: string; supportsDynamicToolNamespaces?: boolean; supportsInputSchema?: boolean; supportsParallelToolCalls?: boolean; [key: string]: unknown; }
+export interface GrokCapabilities { protocol?: Protocol; model?: string; supportsClientFunctionCalls?: boolean; supportsParallelToolCalls?: boolean; [key: string]: unknown; }
+export interface BridgeHandshake { bridgeVersion: string; codex: CodexCapabilities; grok: GrokCapabilities; }
+export function fingerprint(value: unknown): string;
+export function createHandshake(options?: { bridgeVersion?: string; codex: CodexCapabilities; grok?: GrokCapabilities }): BridgeHandshake;
+export function negotiateCapabilities(handshake: BridgeHandshake, registry?: Array<{ fingerprint: string; adapter?: string; requiredCapabilities?: Record<string, unknown> }>): { enabled: boolean; mode: "tools" | "text-only"; reason?: string; adapter?: string; fingerprint?: string };
