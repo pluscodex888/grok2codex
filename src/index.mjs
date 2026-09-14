@@ -13,6 +13,42 @@ export function createBridge(options) {
   return new ToolBridge(options);
 }
 
+/**
+ * Convert an OpenAI-compatible provider tool declaration into the bridge's
+ * stable catalog shape. This is useful when a desktop client sends its
+ * approved Codex catalog with each request. The caller still owns the
+ * executor and may reject the catalog through its policy.
+ */
+export function providerToolsToDefinitions(protocol, providerTools, { source = "codex", namespace = "provider" } = {}) {
+  if (protocol !== "responses" && protocol !== "chat") {
+    throw new BridgeError("protocol", `unsupported protocol: ${protocol}`);
+  }
+  const definitions = [];
+  const visit = (item, currentNamespace) => {
+    if (!item || typeof item !== "object") return;
+    if (item.type === "namespace") {
+      const nextNamespace = String(item.name || currentNamespace);
+      for (const child of item.tools || item.children || []) visit(child, nextNamespace);
+      return;
+    }
+    const raw = item.type === "function" && item.function ? item.function : item;
+    if (!raw || raw.type === "custom" || !raw.name) return;
+    const name = String(raw.name);
+    const stableId = `${currentNamespace}.${name}`;
+    definitions.push({
+      stableId,
+      namespace: currentNamespace,
+      name,
+      wireName: encodeWireName(currentNamespace, name),
+      description: raw.description || name,
+      inputSchema: clone(raw.parameters || raw.input_schema || { type: "object", properties: {} }),
+      source,
+    });
+  };
+  for (const item of providerTools || []) visit(item, namespace);
+  return definitions;
+}
+
 export function encodeWireName(namespace, name) {
   const encode = value => String(value).replace(/[^A-Za-z0-9_-]/g, char => `_x${char.codePointAt(0).toString(16)}_`);
   const left = encode(namespace || "default");
@@ -111,6 +147,7 @@ class ToolBridge {
   }
 
   _setTools(definitions) {
+    this.tools.clear();
     const seen = new Set();
     for (const definition of definitions) {
       if (!definition?.stableId || !definition?.name || !definition?.inputSchema) continue;
@@ -121,6 +158,11 @@ class ToolBridge {
       seen.add(wireName);
       this.tools.set(wireName, { ...clone(definition), wireName });
     }
+  }
+
+  setTools(definitions) {
+    this._setTools(definitions || []);
+    return this;
   }
 
   getToolDefinitions() {
@@ -221,3 +263,7 @@ class ToolBridge {
     }
   }
 }
+
+export { createOpenAITransport } from "./http.mjs";
+export { createBridgeServer } from "./server.mjs";
+export { createCodexExecutor } from "./codex.mjs";
