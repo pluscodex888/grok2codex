@@ -143,6 +143,11 @@ opens a second listener, reads credentials, or changes the encrypted bridge.
 Unknown fingerprints remain text-only through the normal capability
 negotiation path.
 
+The adapter is enabled only for a selected model whose ID starts with `grok`.
+Pass `enabled: false` from the desktop settings to force the existing model
+path; non-Grok models are disabled automatically and receive no bridge tool
+catalog.
+
 ## Scope and licensing
 
 This repository is an independent protocol/client library. It contains no vendor credentials, private URLs, internal paths, copied application code, or project-specific deployment configuration. It is released under the MIT License.
