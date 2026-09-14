@@ -32,8 +32,35 @@ export function providerToolsToDefinitions(protocol, providerTools, { source = "
       for (const child of item.tools || item.children || []) visit(child, nextNamespace);
       return;
     }
+    if (item.type === "custom" && item.name) {
+      const name = String(item.name);
+      definitions.push({
+        stableId: `${currentNamespace}.${name}`,
+        namespace: currentNamespace,
+        name,
+        wireName: encodeWireName(currentNamespace, name),
+        description: String(item.description || `Custom tool ${name}`),
+        inputSchema: { type: "object", required: ["input"], properties: { input: { type: "string" } } },
+        source,
+        kind: "custom",
+      });
+      return;
+    }
+    if (item.type === "tool_search") {
+      definitions.push({
+        stableId: `${currentNamespace}.tool_search`,
+        namespace: currentNamespace,
+        name: "tool_search",
+        wireName: encodeWireName(currentNamespace, "tool_search"),
+        description: "Search approved tools for the current task.",
+        inputSchema: { type: "object", required: ["query"], properties: { query: { type: "string" }, limit: { type: "integer" } } },
+        source,
+        kind: "tool_search",
+      });
+      return;
+    }
     const raw = item.type === "function" && item.function ? item.function : item;
-    if (!raw || raw.type === "custom" || !raw.name) return;
+    if (!raw || !raw.name) return;
     const name = String(raw.name);
     const stableId = `${currentNamespace}.${name}`;
     definitions.push({

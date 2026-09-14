@@ -67,6 +67,12 @@ const relay = createBridgeServer({ bridge, host: "127.0.0.1", port: 0 });
 console.log(await relay.listen());
 ```
 
+In the enhanced desktop deployment, set `baseUrl` to the configured internal
+New-API/CLIProxyAPI model route (the same OpenAI-compatible route used by the
+desktop model provider), and point the desktop provider at the relay's local
+`/v1` endpoint. Do not point the relay at a direct xAI route when the host
+expects Codex tools: the direct route has no local approval executor.
+
 When the approved tool catalog is request-scoped, provide
 `bridgeForRequest(protocol, body)` and return a separately constructed bridge
 for that request. This avoids mutating a shared catalog while another turn is

@@ -92,6 +92,8 @@ test("provider declarations can be adopted as a stable Codex catalog", () => {
   assert.equal(namespaced[0].wireName, "workspace__write_file");
   const additional = providerToolsToDefinitions("responses", { tools: [], additional_tools: [{ type: "function", name: "search", parameters: { type: "object" } }] });
   assert.equal(additional[0].name, "search");
+  const custom = providerToolsToDefinitions("responses", [{ type: "custom", name: "apply_patch" }]);
+  assert.equal(custom[0].inputSchema.required[0], "input");
 });
 
 test("OpenAI transport sends the selected protocol without leaking credentials", async () => {
