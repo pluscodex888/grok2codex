@@ -134,6 +134,15 @@ npm test
 
 The package has no runtime dependencies. Keep provider-specific transports and desktop adapters in the consuming application or separate adapter packages.
 
+### Codex汉化增强版 host adapter
+
+The optional `./enhanced` entry point is the integration boundary for the
+desktop client. Pass the client's existing model transport as `upstream` and
+its approved tool executor as `invoke`; the adapter never starts Codex,
+opens a second listener, reads credentials, or changes the encrypted bridge.
+Unknown fingerprints remain text-only through the normal capability
+negotiation path.
+
 ## Scope and licensing
 
 This repository is an independent protocol/client library. It contains no vendor credentials, private URLs, internal paths, copied application code, or project-specific deployment configuration. It is released under the MIT License.

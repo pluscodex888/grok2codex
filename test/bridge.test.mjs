@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { createServer as createHttpServer } from "node:http";
 import { createBridge, createBridgeServer, createGrokCodexRelay, createHandshake, createJsonRpcSocketClient, createOpenAITransport, createSocketExecutor, encodeWireName, fingerprint, negotiateCapabilities, providerToolsToDefinitions } from "../src/index.mjs";
+import { createEnhancedDesktopRelay } from "../src/enhanced.mjs";
 
 const tools = [{
   stableId: "workspace.read",
@@ -11,6 +12,20 @@ const tools = [{
   inputSchema: { type: "object", required: ["path"], properties: { path: { type: "string" } } },
   source: "codex"
 }];
+
+test("enhanced desktop adapter keeps host boundaries injectable", async () => {
+  const relay = createEnhancedDesktopRelay({
+    upstream: { baseUrl: "https://grok.invalid", apiKey: "test" },
+    codex: { fingerprint: fingerprint({ appServer: "v2", toolRegistry: "current" }), supportsInputSchema: true },
+    grok: { protocol: "responses", model: "grok", supportsClientFunctionCalls: true },
+    registry: [{ fingerprint: fingerprint({ appServer: "v2", toolRegistry: "current" }), adapter: "codex-v2", requiredCapabilities: { supportsInputSchema: true } }],
+    tools,
+    invoke: async ({ tool }) => ({ tool, ok: true }),
+  });
+  assert.equal(relay.capabilities.mode, "tools");
+  assert.equal(typeof relay.listen, "function");
+  await relay.close();
+});
 
 test("wire names are stable and safe", () => {
   assert.equal(encodeWireName("workspace", "read_file"), "workspace__read_file");

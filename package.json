@@ -31,6 +31,10 @@
     "./socket": {
       "types": "./src/index.d.ts",
       "import": "./src/socket.mjs"
+    },
+    "./enhanced": {
+      "types": "./src/index.d.ts",
+      "import": "./src/enhanced.mjs"
     }
   },
   "files": ["src", "README.md", "LICENSE"],
