@@ -39,6 +39,8 @@ const response = await bridge.runTurn({
 });
 ```
 
+If the host owns the request loop, use `getProviderTools("responses")` or `getProviderTools("chat")` to obtain the correctly shaped declarations. `prepareRequest()` is a convenience that installs the bridge-owned tool list and does not copy arbitrary caller tools into the catalog.
+
 ## Boundary rules
 
 The executor remains the source of truth for approvals, workspace roots, sandboxing, cancellation, and auditing. The bridge must be placed between the model transport and that executor; it must not become a second executor. Unknown tools, invalid JSON, schema failures, duplicate names, and unknown fingerprints fail closed.

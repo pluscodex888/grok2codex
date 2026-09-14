@@ -34,6 +34,38 @@ test("responses calls execute and continue with the same call id", async () => {
   assert.deepEqual(requests[1].request.input[0], { type: "function_call_output", call_id: "call-1", output: '{"content":"read:README.md"}' });
 });
 
+test("provider tool declarations are protocol-specific", () => {
+  const bridge = createBridge({ tools, transport: { complete() {} }, executor: { execute() {} } });
+  assert.deepEqual(bridge.getProviderTools("responses")[0], {
+    type: "function",
+    name: "workspace__read_file",
+    description: "Read a file",
+    parameters: tools[0].inputSchema
+  });
+  assert.deepEqual(bridge.getProviderTools("chat")[0], {
+    type: "function",
+    function: { name: "workspace__read_file", description: "Read a file", parameters: tools[0].inputSchema }
+  });
+});
+
+test("chat calls return tool messages and continue", async () => {
+  const requests = [];
+  const bridge = createBridge({
+    tools,
+    transport: { async complete(input) {
+      requests.push(input);
+      return requests.length === 1
+        ? { id: "chat-1", choices: [{ message: { role: "assistant", tool_calls: [{ id: "tool-1", type: "function", function: { name: "workspace__read_file", arguments: '{"path":"a.txt"}' } }] } }] }
+        : { id: "chat-2", choices: [{ message: { role: "assistant", content: "done" } }] };
+    } },
+    executor: { async execute() { return "ok"; } }
+  });
+  const result = await bridge.runTurn({ protocol: "chat", request: { model: "grok", messages: [{ role: "user", content: "read" }] } });
+  assert.equal(result.id, "chat-2");
+  assert.deepEqual(requests[0].request.tools, bridge.getProviderTools("chat"));
+  assert.deepEqual(requests[1].request.messages.at(-1), { role: "tool", tool_call_id: "tool-1", content: "ok" });
+});
+
 test("unknown tools fail closed and do not reach executor", async () => {
   let executed = false;
   const bridge = createBridge({ tools, transport: { async complete() { return { output: [{ type: "function_call", call_id: "x", name: "unknown", arguments: "{}" }] }; } }, executor: { async execute() { executed = true; } } });

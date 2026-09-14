@@ -21,5 +21,5 @@ export interface BridgePolicy { allowTool?(tool: ToolDefinition, argumentsValue:
 export interface BridgeOptions { transport: BridgeTransport; executor: BridgeExecutor; tools?: ToolDefinition[]; policy?: BridgePolicy; maxAdvertisedTools?: number; }
 export interface RunTurnOptions { protocol?: Protocol; request: unknown; context?: unknown; signal?: AbortSignal; }
 export class BridgeError extends Error { code: BridgeErrorCode; details: Record<string, unknown>; }
-export function createBridge(options: BridgeOptions): { getToolDefinitions(): ToolDefinition[]; executeCalls(calls: ToolCall[], context?: unknown): Promise<ToolResult[]>; runTurn(options: RunTurnOptions): Promise<any>; };
+export function createBridge(options: BridgeOptions): { getToolDefinitions(): ToolDefinition[]; getProviderTools(protocol?: Protocol): unknown[]; prepareRequest(protocol: Protocol, request: unknown): any; executeCalls(calls: ToolCall[], context?: unknown): Promise<ToolResult[]>; runTurn(options: RunTurnOptions): Promise<any>; };
 export function encodeWireName(namespace: string | undefined, name: string): string;

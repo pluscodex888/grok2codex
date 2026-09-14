@@ -144,6 +144,36 @@ class ToolBridge {
     }];
   }
 
+  getProviderTools(protocol = "responses") {
+    const definitions = this.getToolDefinitions();
+    if (protocol === "responses") {
+      return definitions.map(tool => ({
+        type: "function",
+        name: tool.wireName,
+        description: tool.description || tool.name,
+        parameters: clone(tool.inputSchema)
+      }));
+    }
+    if (protocol === "chat") {
+      return definitions.map(tool => ({
+        type: "function",
+        function: {
+          name: tool.wireName,
+          description: tool.description || tool.name,
+          parameters: clone(tool.inputSchema)
+        }
+      }));
+    }
+    throw new BridgeError("protocol", `unsupported protocol: ${protocol}`);
+  }
+
+  prepareRequest(protocol, request) {
+    const prepared = clone(request) || {};
+    prepared.tools = this.getProviderTools(protocol);
+    if (protocol === "responses") prepared.parallel_tool_calls = true;
+    return prepared;
+  }
+
   _resolve(call) {
     if (call.wireName === "bridge__dispatch") {
       let payload;
@@ -181,7 +211,7 @@ class ToolBridge {
 
   async runTurn({ protocol = "responses", request, context, signal }) {
     if (protocol !== "responses" && protocol !== "chat") throw new BridgeError("protocol", `unsupported protocol: ${protocol}`);
-    let current = clone(request);
+    let current = this.prepareRequest(protocol, request);
     for (;;) {
       const response = await this.transport.complete({ protocol, request: current, tools: this.getToolDefinitions() }, signal);
       const calls = extractCalls(protocol, response);
