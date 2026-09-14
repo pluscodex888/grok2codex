@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createServer as createHttpServer } from "node:http";
-import { createBridge, createBridgeServer, createHandshake, createOpenAITransport, encodeWireName, fingerprint, negotiateCapabilities, providerToolsToDefinitions } from "../src/index.mjs";
+import { createBridge, createBridgeServer, createGrokCodexRelay, createHandshake, createOpenAITransport, encodeWireName, fingerprint, negotiateCapabilities, providerToolsToDefinitions } from "../src/index.mjs";
 
 const tools = [{
   stableId: "workspace.read",
@@ -222,4 +222,19 @@ test("a text-only capability decision never advertises the Codex catalog", () =>
   const bridge = createBridge({ capabilities: { enabled: false, mode: "text-only" }, tools, transport: { complete() {} }, executor: { execute() {} } });
   assert.deepEqual(bridge.getToolDefinitions(), []);
   assert.deepEqual(bridge.getProviderTools("responses"), []);
+});
+
+test("integration factory wires handshake, transport, executor, and relay together", () => {
+  const fp = fingerprint({ appServer: "fixture", registry: 1 });
+  const relay = createGrokCodexRelay({
+    upstream: { baseUrl: "http://127.0.0.1:1", fetchImpl: async () => new Response("{}") },
+    codex: { fingerprint: fp, supportsInputSchema: true },
+    grok: { protocol: "responses", supportsClientFunctionCalls: true },
+    registry: [{ fingerprint: fp, adapter: "fixture", requiredCapabilities: { supportsInputSchema: true } }],
+    tools,
+    invoke: async () => "ok",
+  });
+  assert.equal(relay.capabilities.enabled, true);
+  assert.equal(relay.handshake.codex.fingerprint, fp);
+  assert.equal(relay.bridge.getToolDefinitions().length, 1);
 });

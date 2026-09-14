@@ -332,3 +332,4 @@ export { createOpenAITransport } from "./http.mjs";
 export { createBridgeServer } from "./server.mjs";
 export { createCodexExecutor } from "./codex.mjs";
 export { createHandshake, fingerprint, negotiateCapabilities } from "./capabilities.mjs";
+export { createGrokCodexRelay } from "./integration.mjs";

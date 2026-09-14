@@ -83,6 +83,22 @@ the upstream tool loop private while preserving the standard response shape
 expected by the desktop renderer. Approval, workspace, cancellation, and
 MCP routing remain host responsibilities.
 
+For a single integration entry point, use `createGrokCodexRelay()` with the
+Codex fingerprint and the host's existing app-server callback:
+
+```js
+import { createGrokCodexRelay, fingerprint } from "@grok2codex/client-bridge";
+const relay = createGrokCodexRelay({
+  upstream: { baseUrl: process.env.INTERNAL_MODEL_BASE_URL, apiKey: process.env.INTERNAL_MODEL_KEY },
+  codex: { fingerprint: fingerprint({ appServer: "v2", toolRegistry: "current" }), supportsInputSchema: true },
+  grok: { protocol: "responses", model: "grok", supportsClientFunctionCalls: true },
+  registry: [{ fingerprint: fingerprint({ appServer: "v2", toolRegistry: "current" }), adapter: "codex-v2", requiredCapabilities: { supportsInputSchema: true } }],
+  tools,
+  invoke: ({ tool, arguments: args, correlation }) => existingCodexAppServerGateway(tool, args, correlation),
+});
+await relay.listen();
+```
+
 Before advertising tools, hosts can perform a capability handshake. The
 fingerprint registry is owned by the bridge package; an unknown Codex
 fingerprint returns `text-only` and never executes a guessed tool schema.
