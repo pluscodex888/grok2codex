@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createServer as createHttpServer } from "node:http";
-import { createBridge, createBridgeServer, createGrokCodexRelay, createHandshake, createOpenAITransport, encodeWireName, fingerprint, negotiateCapabilities, providerToolsToDefinitions } from "../src/index.mjs";
+import { createBridge, createBridgeServer, createGrokCodexRelay, createHandshake, createJsonRpcSocketClient, createOpenAITransport, createSocketExecutor, encodeWireName, fingerprint, negotiateCapabilities, providerToolsToDefinitions } from "../src/index.mjs";
 
 const tools = [{
   stableId: "workspace.read",
@@ -237,4 +237,22 @@ test("integration factory wires handshake, transport, executor, and relay togeth
   assert.equal(relay.capabilities.enabled, true);
   assert.equal(relay.handshake.codex.fingerprint, fp);
   assert.equal(relay.bridge.getToolDefinitions().length, 1);
+});
+
+test("socket adapter correlates JSON-RPC calls without coupling to a socket implementation", async () => {
+  const listeners = new Map();
+  const socket = {
+    on(event, listener) { listeners.set(event, listener); return this; },
+    write(frame) {
+      const request = JSON.parse(frame);
+      const result = { output: { ok: true, stableId: request.params.stableId, callId: request.params.correlation.callId } };
+      queueMicrotask(() => listeners.get("data")?.(JSON.stringify({ jsonrpc: "2.0", id: request.id, result }) + "\n"));
+    },
+    end() { listeners.get("close")?.(); },
+  };
+  const rpc = createJsonRpcSocketClient({ socket });
+  const executor = createSocketExecutor({ rpc });
+  const output = await executor.execute(tools[0], { path: "x" }, { callId: "call-7", threadId: "t", turnId: "u" });
+  assert.deepEqual(output, { ok: true, stableId: "workspace.read", callId: "call-7" });
+  rpc.close();
 });
