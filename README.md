@@ -39,6 +39,44 @@ const response = await bridge.runTurn({
 });
 ```
 
+## Connecting a Grok-compatible endpoint
+
+The package includes a credential-in-memory OpenAI-compatible transport. It
+supports the Responses and Chat Completions paths used by the enhanced
+desktop client and forces the internal continuation requests to be buffered,
+so a tool call is never acknowledged before its approved executor returns.
+
+```js
+import { createBridge, createOpenAITransport } from "@grok2codex/client-bridge";
+
+const transport = createOpenAITransport({
+  baseUrl: process.env.GROK_BASE_URL,
+  apiKey: process.env.GROK_API_KEY,
+});
+const bridge = createBridge({ transport, tools, executor });
+```
+
+For a client that expects an OpenAI-compatible local endpoint, use the
+optional relay server. It exposes `/healthz`, `/v1/models`,
+`/v1/responses`, and `/v1/chat/completions`; the host still supplies the
+executor that talks to its existing Codex/app-server approval path.
+
+```js
+import { createBridgeServer } from "@grok2codex/client-bridge/server";
+const relay = createBridgeServer({ bridge, host: "127.0.0.1", port: 0 });
+console.log(await relay.listen());
+```
+
+When the approved tool catalog is request-scoped, provide
+`bridgeForRequest(protocol, body)` and return a separately constructed bridge
+for that request. This avoids mutating a shared catalog while another turn is
+running.
+
+The relay emits a compact final SSE sequence when `stream: true`. This keeps
+the upstream tool loop private while preserving the standard response shape
+expected by the desktop renderer. Approval, workspace, cancellation, and
+MCP routing remain host responsibilities.
+
 If the host owns the request loop, use `getProviderTools("responses")` or `getProviderTools("chat")` to obtain the correctly shaped declarations. `prepareRequest()` is a convenience that installs the bridge-owned tool list and does not copy arbitrary caller tools into the catalog.
 
 ## Boundary rules
