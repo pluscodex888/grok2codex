@@ -99,6 +99,18 @@ const relay = createGrokCodexRelay({
 await relay.listen();
 ```
 
+The executor can also be isolated behind a newline-delimited JSON-RPC socket:
+
+```js
+import { createJsonRpcSocketClient, createSocketExecutor } from "@grok2codex/client-bridge/socket";
+const rpc = createJsonRpcSocketClient({ connect: () => connectToDesktopRelaySocket() });
+const executor = createSocketExecutor({ rpc, method: "codex/tool/execute" });
+```
+
+Each request carries a stable tool ID, validated arguments, and thread/turn
+correlation. The socket side owns approvals and app-server access; closing or
+timing out the socket fails only the pending tool call.
+
 Before advertising tools, hosts can perform a capability handshake. The
 fingerprint registry is owned by the bridge package; an unknown Codex
 fingerprint returns `text-only` and never executes a guessed tool schema.
