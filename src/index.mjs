@@ -153,6 +153,7 @@ class ToolBridge {
     this.maxToolOutputBytes = options.maxToolOutputBytes ?? 2 * 1024 * 1024;
     this.maxTurns = options.maxTurns ?? 8;
     this.onStateChange = typeof options.onStateChange === "function" ? options.onStateChange : null;
+    this.capabilities = options.capabilities || { enabled: true };
     this.tools = new Map();
     this._setTools(options.tools || []);
   }
@@ -177,6 +178,7 @@ class ToolBridge {
   }
 
   getToolDefinitions() {
+    if (this.capabilities.enabled === false) return [];
     const definitions = [...this.tools.values()];
     if (definitions.length <= this.maxAdvertisedTools) return clone(definitions);
     return [{
