@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createServer as createHttpServer } from "node:http";
-import { createBridge, createBridgeServer, createOpenAITransport, encodeWireName, providerToolsToDefinitions } from "../src/index.mjs";
+import { createBridge, createBridgeServer, createHandshake, createOpenAITransport, encodeWireName, fingerprint, negotiateCapabilities, providerToolsToDefinitions } from "../src/index.mjs";
 
 const tools = [{
   stableId: "workspace.read",
@@ -90,6 +90,8 @@ test("provider declarations can be adopted as a stable Codex catalog", () => {
   assert.equal(definitions[0].wireName, "provider__read_file");
   const namespaced = providerToolsToDefinitions("responses", [{ type: "namespace", name: "workspace", tools: [{ type: "function", name: "write_file", parameters: { type: "object" } }] }]);
   assert.equal(namespaced[0].wireName, "workspace__write_file");
+  const additional = providerToolsToDefinitions("responses", { tools: [], additional_tools: [{ type: "function", name: "search", parameters: { type: "object" } }] });
+  assert.equal(additional[0].name, "search");
 });
 
 test("OpenAI transport sends the selected protocol without leaking credentials", async () => {
@@ -179,4 +181,35 @@ test("end-to-end relay sends Grok tool call to the Codex executor and resumes", 
     await relay.close();
     await new Promise(resolve => upstream.close(resolve));
   }
+});
+
+test("multiple calls run concurrently, preserve response order, and publish state transitions", async () => {
+  const states = [];
+  let active = 0;
+  let peak = 0;
+  const bridge = createBridge({
+    tools: [tools[0], { ...tools[0], stableId: "workspace.stat", name: "stat_file", wireName: "workspace__stat_file" }],
+    onStateChange(event) { states.push(event); },
+    transport: { async complete(input) {
+      return input.request.previous_response_id
+        ? { id: "done", output: [{ type: "message", content: [{ type: "output_text", text: "done" }] }] }
+        : { id: "calls", output: [
+          { type: "function_call", call_id: "a", name: "workspace__read_file", arguments: '{"path":"a"}' },
+          { type: "function_call", call_id: "b", name: "workspace__stat_file", arguments: '{"path":"b"}' },
+        ] };
+    } },
+    executor: { async execute(_tool, args) { active += 1; peak = Math.max(peak, active); await new Promise(resolve => setTimeout(resolve, 10)); active -= 1; return args.path; } },
+  });
+  await bridge.runTurn({ request: { model: "grok", input: "two" } });
+  assert.equal(peak, 2);
+  assert.deepEqual(states.filter(item => item.state === "RESULT_READY").map(item => item.vendorCallId), ["a", "b"]);
+  assert.ok(states.some(item => item.state === "DISCOVERED"));
+});
+
+test("unknown fingerprint disables tools while known handshake enables them", () => {
+  const fp = fingerprint({ appServer: "fixture-v1", tools: ["read_file"] });
+  const handshake = createHandshake({ codex: { fingerprint: fp, supportsInputSchema: true }, grok: { supportsClientFunctionCalls: true } });
+  assert.equal(negotiateCapabilities(handshake, []).mode, "text-only");
+  const accepted = negotiateCapabilities(handshake, [{ fingerprint: fp, adapter: "fixture-v1", requiredCapabilities: { supportsInputSchema: true } }]);
+  assert.deepEqual(accepted, { enabled: true, mode: "tools", adapter: "fixture-v1", fingerprint: fp });
 });

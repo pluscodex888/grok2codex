@@ -77,6 +77,13 @@ the upstream tool loop private while preserving the standard response shape
 expected by the desktop renderer. Approval, workspace, cancellation, and
 MCP routing remain host responsibilities.
 
+Before advertising tools, hosts can perform a capability handshake. The
+fingerprint registry is owned by the bridge package; an unknown Codex
+fingerprint returns `text-only` and never executes a guessed tool schema.
+`onStateChange` exposes the call lifecycle (`DISCOVERED`, `VALIDATED`,
+`APPROVAL_PENDING`, `EXECUTING`, `RESULT_READY`, or `REJECTED`) for the
+renderer and audit sink without exposing tool arguments.
+
 If the host owns the request loop, use `getProviderTools("responses")` or `getProviderTools("chat")` to obtain the correctly shaped declarations. `prepareRequest()` is a convenience that installs the bridge-owned tool list and does not copy arbitrary caller tools into the catalog.
 
 ## Boundary rules
