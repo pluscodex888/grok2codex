@@ -1,0 +1,17 @@
+{
+  "name": "@codex-bridge/gem2codex",
+  "version": "0.1.0",
+  "description": "Gemini generateContent to an approved Codex tool-chain bridge",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.mjs",
+    "./gemini-http": "./src/gemini-http.mjs",
+    "./codex": "./src/codex.mjs",
+    "./server": "./src/server.mjs",
+    "./integration": "./src/integration.mjs"
+  },
+  "files": ["src", "README.md", "docs", "LICENSE"],
+  "scripts": {"test": "node --test test/*.test.mjs"},
+  "engines": {"node": ">=20"},
+  "license": "MIT"
+}
