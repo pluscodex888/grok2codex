@@ -1,6 +1,6 @@
 {
   "name": "@grok2codex/client-bridge",
-  "version": "0.2.1",
+  "version": "0.2.0",
   "description": "Provider-neutral client bridge for routing Grok tool calls to an approved local tool executor.",
   "type": "module",
   "exports": {
@@ -31,10 +31,6 @@
     "./socket": {
       "types": "./src/index.d.ts",
       "import": "./src/socket.mjs"
-    },
-    "./enhanced": {
-      "types": "./src/index.d.ts",
-      "import": "./src/enhanced.mjs"
     }
   },
   "files": ["src", "README.md", "LICENSE"],

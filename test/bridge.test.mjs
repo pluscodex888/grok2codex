@@ -2,7 +2,6 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { createServer as createHttpServer } from "node:http";
 import { createBridge, createBridgeServer, createGrokCodexRelay, createHandshake, createJsonRpcSocketClient, createOpenAITransport, createSocketExecutor, encodeWireName, fingerprint, negotiateCapabilities, providerToolsToDefinitions } from "../src/index.mjs";
-import { createEnhancedDesktopRelay, isGrokModel } from "../src/enhanced.mjs";
 
 const tools = [{
   stableId: "workspace.read",
@@ -12,39 +11,6 @@ const tools = [{
   inputSchema: { type: "object", required: ["path"], properties: { path: { type: "string" } } },
   source: "codex"
 }];
-
-test("enhanced desktop adapter keeps host boundaries injectable", async () => {
-  const relay = createEnhancedDesktopRelay({
-    upstream: { baseUrl: "https://grok.invalid", apiKey: "test" },
-    codex: { fingerprint: fingerprint({ appServer: "v2", toolRegistry: "current" }), supportsInputSchema: true },
-    grok: { protocol: "responses", model: "grok", supportsClientFunctionCalls: true },
-    registry: [{ fingerprint: fingerprint({ appServer: "v2", toolRegistry: "current" }), adapter: "codex-v2", requiredCapabilities: { supportsInputSchema: true } }],
-    tools,
-    invoke: async ({ tool }) => ({ tool, ok: true }),
-  });
-  assert.equal(relay.capabilities.mode, "tools");
-  assert.equal(typeof relay.listen, "function");
-  await relay.close();
-});
-
-test("enhanced adapter only advertises tools for enabled Grok models", async () => {
-  assert.equal(isGrokModel("grok-4"), true);
-  assert.equal(isGrokModel("deepseek-v4-flash"), false);
-  const base = {
-    upstream: { baseUrl: "https://model.invalid", apiKey: "test" },
-    codex: { fingerprint: fingerprint({ appServer: "v2", toolRegistry: "current" }), supportsInputSchema: true },
-    registry: [{ fingerprint: fingerprint({ appServer: "v2", toolRegistry: "current" }) }],
-    tools, invoke: async () => ({ ok: true }),
-  };
-  const off = createEnhancedDesktopRelay({ ...base, grok: { model: "grok-4", supportsClientFunctionCalls: true }, enabled: false });
-  assert.equal(off.enabled, false);
-  assert.equal(off.capabilities.mode, "text-only");
-  await off.close();
-  const other = createEnhancedDesktopRelay({ ...base, grok: { model: "deepseek-v4-flash", supportsClientFunctionCalls: true } });
-  assert.equal(other.enabled, false);
-  assert.equal(other.disabledReason, "non_grok_model");
-  await other.close();
-});
 
 test("wire names are stable and safe", () => {
   assert.equal(encodeWireName("workspace", "read_file"), "workspace__read_file");

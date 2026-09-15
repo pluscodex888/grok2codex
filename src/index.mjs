@@ -334,5 +334,3 @@ export { createCodexExecutor } from "./codex.mjs";
 export { createHandshake, fingerprint, negotiateCapabilities } from "./capabilities.mjs";
 export { createGrokCodexRelay } from "./integration.mjs";
 export { createJsonRpcSocketClient, createSocketExecutor } from "./socket.mjs";
-export { createEnhancedDesktopRelay } from "./enhanced.mjs";
-export { createResponsesToolCodec, createClientToolPassthrough } from "./passthrough.mjs";
