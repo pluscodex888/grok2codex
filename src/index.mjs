@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 const SAFE_NAME = /^[A-Za-z0-9_-]+$/;
 let bridgeCallSequence = 0;
 
@@ -87,7 +89,16 @@ export function encodeWireName(namespace, name) {
   const encode = value => String(value).replace(/[^A-Za-z0-9_-]/g, char => `_x${char.codePointAt(0).toString(16)}_`);
   const left = encode(namespace || "default");
   const right = encode(name);
-  return `${left}__${right}`;
+  const encoded = `${left}__${right}`;
+  if (encoded.length <= 64 && /^[A-Za-z_]/.test(encoded)) return encoded;
+  // Bound the wire identity before a provider truncates it. Hash the original
+  // pair so neither catalog order nor lossy character escaping changes identity.
+  const digest = createHash("sha256")
+    .update("grok2codex-wire-name-v1\0")
+    .update(JSON.stringify([String(namespace || "default"), String(name)]))
+    .digest("hex").slice(0, 32);
+  const prefix = (/^[A-Za-z_]/.test(encoded) ? encoded : `tool_${encoded}`).slice(0, 31);
+  return `${prefix}_${digest}`;
 }
 
 function isObject(value) {
@@ -181,6 +192,7 @@ class ToolBridge {
     this.maxTurns = options.maxTurns ?? 8;
     this.onStateChange = typeof options.onStateChange === "function" ? options.onStateChange : null;
     this.capabilities = options.capabilities || { enabled: true };
+    this.nativeTools = clone(options.nativeTools || []);
     this.tools = new Map();
     this._setTools(options.tools || []);
   }
@@ -229,12 +241,19 @@ class ToolBridge {
   getProviderTools(protocol = "responses") {
     const definitions = this.getToolDefinitions();
     if (protocol === "responses") {
-      return definitions.map(tool => ({
+      const tools = definitions.map(tool => ({
         type: "function",
         name: tool.wireName,
         description: tool.description || tool.name,
         parameters: clone(tool.inputSchema)
       }));
+      const seenNativeTypes = new Set(tools.map(tool => tool.type));
+      for (const tool of this.nativeTools) {
+        if (!tool || typeof tool !== "object" || !tool.type || seenNativeTypes.has(tool.type)) continue;
+        tools.push(clone(tool));
+        seenNativeTypes.add(tool.type);
+      }
+      return tools;
     }
     if (protocol === "chat") {
       return definitions.map(tool => ({
@@ -334,3 +353,5 @@ export { createCodexExecutor } from "./codex.mjs";
 export { createHandshake, fingerprint, negotiateCapabilities } from "./capabilities.mjs";
 export { createGrokCodexRelay } from "./integration.mjs";
 export { createJsonRpcSocketClient, createSocketExecutor } from "./socket.mjs";
+export { createEnhancedDesktopRelay, isGrokModel } from "./enhanced.mjs";
+export { createClientToolPassthrough, createResponsesToolCodec } from "./passthrough.mjs";

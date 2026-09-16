@@ -12,6 +12,7 @@ export function createEnhancedDesktopRelay({ upstream, codex, grok = {}, registr
     upstream, codex, grok: { ...grok, supportsClientFunctionCalls: active && grok.supportsClientFunctionCalls === true },
     registry: active ? registry : [], tools: active ? tools : [], invoke, onResult,
     policy: { ...policy, onStateChange }, server, bridgeVersion,
+    imageGeneration: grok.imageGeneration !== false,
   });
   return { ...relay, enabled: active, disabledReason: active ? undefined : (modelEnabled ? "non_grok_model" : "disabled_in_settings") };
 }

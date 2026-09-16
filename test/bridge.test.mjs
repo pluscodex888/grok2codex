@@ -49,6 +49,25 @@ test("provider tool declarations are protocol-specific", () => {
   });
 });
 
+test("Responses passthrough injects the native Grok image tool without exposing it as a client executor", async () => {
+  const requests = [];
+  const passthrough = (await import("../src/passthrough.mjs")).createClientToolPassthrough({
+    nativeTools: [{ type: "image_generation" }],
+    transport: { async complete(input) {
+      requests.push(input.request);
+      return { id: "image-response", output: [{
+        type: "image_generation_call", id: "ig-1", status: "completed", result: "aGVsbG8="
+      }] };
+    } },
+  });
+  const result = await passthrough.runTurn({
+    protocol: "responses",
+    request: { model: "grok-4.6", input: "draw a chick" },
+  });
+  assert.equal(result.output[0].type, "image_generation_call");
+  assert.deepEqual(requests[0].tools, [{ type: "image_generation" }]);
+});
+
 test("chat calls return tool messages and continue", async () => {
   const requests = [];
   const bridge = createBridge({
@@ -103,7 +122,7 @@ test("OpenAI transport sends the selected protocol without leaking credentials",
     apiKey: "secret",
     fetchImpl: async (url, init) => {
       calls.push({ url, init });
-      return new Response(JSON.stringify({ id: "upstream-1", output: [] }), { status: 200, headers: { "content-type": "application/json" } });
+      return new Response(JSON.stringify({ id: "upstream-1", output: [{ type: "message", role: "assistant", content: [{ type: "output_text", text: "hello" }] }] }), { status: 200, headers: { "content-type": "application/json" } });
     }
   });
   const result = await transport.complete({ protocol: "responses", request: { model: "grok", input: "hi" } });

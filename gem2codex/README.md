@@ -4,7 +4,8 @@ Gemini `generateContent` 中间层：把 Gemini 的 function calling 请求转�
 
 ## 设计边界
 
-- 参考 `E:\git\grok2codex` 的 provider-neutral bridge 结构。
+- 本模块统一维护在 [grok2codex 仓库](https://github.com/pluscodex888/grok2codex) 的 `gem2codex/` 子目录，随根包一起测试、版本化和交付。
+- 通过根包的 `@grok2codex/client-bridge/gemini`、`/gemini/http`、`/gemini/server`、`/gemini/relay` 导入；本子包不单独发布。
 - 中间层只负责 Gemini 协议、工具声明、参数校验、调用关联和多轮续接。
 - Codex/app-server、审批、沙箱、MCP 和审计由宿主通过 `invoke` 提供；本项目不启动 shell、不读取凭据、不绕过审批。
 - 默认监听 `127.0.0.1`，提供 Gemini 原生兼容接口：`/v1beta/models`、`/v1beta/models/:model:generateContent` 和 `:streamGenerateContent`。
@@ -52,4 +53,3 @@ The Gemini API uses `x-goog-api-key` for authentication and returns function cal
 ```sh
 npm test
 ```
-

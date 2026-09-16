@@ -13,7 +13,7 @@ export function fingerprint(value) {
   return `sha256:${createHash("sha256").update(JSON.stringify(canonical(value))).digest("hex")}`;
 }
 
-export function createHandshake({ bridgeVersion = "0.2.0", codex = {}, grok = {} } = {}) {
+export function createHandshake({ bridgeVersion = "0.2.2", codex = {}, grok = {} } = {}) {
   if (!codex.fingerprint || typeof codex.fingerprint !== "string") {
     throw new BridgeError("handshake", "codex fingerprint is required");
   }
@@ -55,4 +55,3 @@ export function negotiateCapabilities(handshake, registry = []) {
   }
   return { enabled: true, mode: "tools", adapter: exact.adapter, fingerprint: fingerprintValue };
 }
-

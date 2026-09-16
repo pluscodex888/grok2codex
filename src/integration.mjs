@@ -10,13 +10,14 @@ export function createGrokCodexRelay({
   upstream,
   codex,
   grok = {},
-  bridgeVersion = "0.2.0",
+  bridgeVersion = "0.2.2",
   registry = [],
   tools = [],
   invoke,
   onResult,
   policy,
   server = {},
+  imageGeneration = true,
 } = {}) {
   const handshake = createHandshake({ bridgeVersion, codex, grok });
   const capabilities = negotiateCapabilities(handshake, registry);
@@ -26,6 +27,7 @@ export function createGrokCodexRelay({
     transport: createOpenAITransport(upstream),
     executor: createCodexExecutor({ invoke, onResult }),
     policy,
+    nativeTools: imageGeneration && grok.imageGeneration !== false ? [{ type: "image_generation" }] : [],
   });
   const relay = createBridgeServer({ ...server, bridge });
   return {
@@ -37,4 +39,3 @@ export function createGrokCodexRelay({
     close: () => relay.close(),
   };
 }
-

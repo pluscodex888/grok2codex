@@ -1,7 +1,7 @@
 {
   "name": "@grok2codex/client-bridge",
-  "version": "0.2.0",
-  "description": "Provider-neutral client bridge for routing Grok tool calls to an approved local tool executor.",
+  "version": "0.2.2",
+  "description": "Shared client tool bridge with OpenAI-compatible Responses and Gemini native protocol adapters.",
   "type": "module",
   "exports": {
     ".": {
@@ -9,7 +9,7 @@
       "import": "./src/index.mjs"
     },
     "./http": {
-      "types": "./src/index.d.ts",
+      "types": "./src/http.d.ts",
       "import": "./src/http.mjs"
     },
     "./server": {
@@ -28,14 +28,35 @@
       "types": "./src/index.d.ts",
       "import": "./src/integration.mjs"
     },
+    "./enhanced": {
+      "types": "./src/index.d.ts",
+      "import": "./src/enhanced.mjs"
+    },
+    "./gemini": {
+      "types": "./gem2codex/src/index.d.ts",
+      "import": "./gem2codex/src/index.mjs"
+    },
+    "./gemini/http": {
+      "types": "./gem2codex/src/gemini-http.d.ts",
+      "import": "./gem2codex/src/gemini-http.mjs"
+    },
+    "./gemini/server": {
+      "types": "./gem2codex/src/server.d.ts",
+      "import": "./gem2codex/src/server.mjs"
+    },
+    "./gemini/relay": {
+      "types": "./gem2codex/src/integration.d.ts",
+      "import": "./gem2codex/src/integration.mjs"
+    },
     "./socket": {
       "types": "./src/index.d.ts",
       "import": "./src/socket.mjs"
     }
   },
-  "files": ["src", "README.md", "LICENSE"],
+  "files": ["src", "gem2codex/src", "gem2codex/package.json", "gem2codex/README.md", "gem2codex/LICENSE", "README.md", "CHANGELOG.md", "LICENSE"],
   "scripts": {
-    "test": "node --test test/*.test.mjs"
+    "test": "node --test test/*.test.mjs gem2codex/test/*.test.mjs",
+    "release": "node scripts/release.mjs"
   },
   "engines": {
     "node": ">=20"

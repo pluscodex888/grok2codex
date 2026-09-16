@@ -1,166 +1,93 @@
-# grok2codex client bridge
+# Grok / Gemini client tool bridge
 
-`@grok2codex/client-bridge` is a small, provider-neutral client middleware for routing Grok client function calls to an already-approved local tool executor.
+One repository and one versioned package for client-owned tool calls. The OpenAI-compatible Responses adapter supports Grok and Gemini model routes; the Gemini native adapter supports `generateContent` and `streamGenerateContent`.
 
-It deliberately does **not** import Codex, CLIProxyAPI, New-API, Electron, an xAI SDK, or any private application type. Integrations provide three narrow interfaces:
+The host owns model credentials, approvals, sandboxing, MCP, and tool execution. This library translates requests, tool names, call IDs, and results. It never starts a shell or obtains credentials from the machine.
 
-- `tools`: a public tool catalog with stable IDs and JSON Schema;
-- `transport`: the caller's Grok Responses or Chat Completions transport;
-- `executor`: the caller's existing, permission-aware local executor.
+## Repository layout
 
-The bridge only performs name mapping, schema checks, policy checks, call/result correlation, dispatcher fallback for large catalogs, and protocol continuation. It never starts a shell, reads a file, stores credentials, or exposes a listener.
+| Path | Responsibility |
+| --- | --- |
+| `src/passthrough.mjs` | Namespaced function/custom tools and client-owned continuation |
+| `src/http.mjs`, `src/server.mjs` | OpenAI-compatible transport and Responses/Chat HTTP endpoints |
+| `src/http-errors.mjs` | Shared upstream status, error details, and retry metadata |
+| `src/index.mjs`, `src/codex.mjs`, `src/socket.mjs` | Tool catalog and optional host-supplied executor APIs |
+| `gem2codex/src/` | Gemini native protocol adapter |
+| `test/`, `gem2codex/test/` | Protocol and delivery regressions |
+| `scripts/release.mjs` | Deterministic archive and file manifest |
 
-## Minimal usage
+`gem2codex/` is maintained here and shipped with the root package. Its package metadata is private to prevent accidental independent publication. Existing root import paths remain available; native Gemini APIs are exposed under `@grok2codex/client-bridge/gemini` and its `/http`, `/server`, and `/relay` subpaths.
 
-If Codex already owns the model/tool loop, use `createClientToolPassthrough`
-with `createOpenAITransport` and the optional `createBridgeServer` instead.
-It translates namespaced functions and custom text tools for a function-only
-provider, then restores call IDs, names, namespaces, and raw custom inputs for
-Codex to execute. Each request makes exactly one upstream call. The next client
-request retains the full task history and tool outputs. No executor is created
-by this mode; approvals, sandboxing, MCP, and cancellation remain in Codex.
-Do not connect the general Codex catalog to a shell-only executor.
+See [the changelog](CHANGELOG.md) for release changes.
 
-The custom-tool conversion follows the public [Responses custom tool protocol](https://developers.openai.com/api/docs/guides/function-calling#custom-tools).
-The provider cannot enforce the original grammar during generation in this
-mode; the original client validates the restored input.
+## Desktop clients that already execute tools
+
+Use the Responses passthrough when the client owns the model/tool loop. It makes one upstream request and returns function or custom calls to that same client. The next client request carries the history and real tool results. Do not connect this mode to a second executor.
 
 ```js
-import { createBridge } from "@grok2codex/client-bridge";
+import {
+  createClientToolPassthrough,
+  createOpenAITransport,
+  createBridgeServer,
+} from "@grok2codex/client-bridge";
 
-const bridge = createBridge({
-  tools: [{
-    stableId: "workspace.read",
-    namespace: "workspace",
-    name: "read_file",
-    description: "Read an approved workspace file",
-    inputSchema: {
-      type: "object",
-      required: ["path"],
-      properties: { path: { type: "string" } }
-    },
-    source: "codex"
-  }],
-  transport: { complete: sendToYourGrokTransport },
-  executor: { execute: executeThroughYourApprovedCodexGateway },
-  policy: { allowTool: checkYourExistingApprovalPolicy }
+const bridge = createClientToolPassthrough({
+  transport: createOpenAITransport({
+    baseUrl: configuredModelEndpoint,
+    apiKey: runtimeCredential,
+  }),
+  nativeTools: [],
 });
-
-const response = await bridge.runTurn({
-  protocol: "responses",
-  request: { model: "grok", input: "Read the project file" }
-});
+const relay = createBridgeServer({ bridge, model: selectedModel });
+await relay.listen();
 ```
 
-## Connecting a Grok-compatible endpoint
+Use the host's configured model endpoint, including its existing authenticated transport when needed. Choose native provider tools explicitly: Grok image generation can use `nativeTools: [{ type: "image_generation" }]`; Gemini model routes can use their supported catalog. Grok and Gemini enable/disable preferences belong to the host and remain independent.
 
-The package includes a credential-in-memory OpenAI-compatible transport. It
-supports the Responses and Chat Completions paths used by the enhanced
-desktop client and forces the internal continuation requests to be buffered,
-so a tool call is never acknowledged before its approved executor returns.
+Namespaces and custom text tools are translated into function declarations, then restored with their original names, namespaces, raw input, and call IDs. Stable wire names fit Gemini's 64-character limit. Historical tools are translated for context without becoming newly executable tools. Text/code blocks remain text and are never synthesized into tool calls.
 
-```js
-import { createBridge, createOpenAITransport } from "@grok2codex/client-bridge";
-
-const transport = createOpenAITransport({
-  baseUrl: process.env.GROK_BASE_URL,
-  apiKey: process.env.GROK_API_KEY,
-});
-const bridge = createBridge({ transport, tools, executor });
-```
-
-For a client that expects an OpenAI-compatible local endpoint, use the
-optional relay server. It exposes `/healthz`, `/v1/models`,
-`/v1/responses`, and `/v1/chat/completions`; the host still supplies the
-executor that talks to its existing Codex/app-server approval path.
+## Gemini native API
 
 ```js
-import { createBridgeServer } from "@grok2codex/client-bridge/server";
-const relay = createBridgeServer({ bridge, host: "127.0.0.1", port: 0 });
-console.log(await relay.listen());
-```
+import { createGeminiCodexRelay } from "@grok2codex/client-bridge/gemini/relay";
 
-In the enhanced desktop deployment, set `baseUrl` to the configured internal
-New-API/CLIProxyAPI model route (the same OpenAI-compatible route used by the
-desktop model provider), and point the desktop provider at the relay's local
-`/v1` endpoint. Do not point the relay at a direct xAI route when the host
-expects Codex tools: the direct route has no local approval executor.
-
-When the approved tool catalog is request-scoped, provide
-`bridgeForRequest(protocol, body)` and return a separately constructed bridge
-for that request. This avoids mutating a shared catalog while another turn is
-running.
-
-The relay emits a compact final SSE sequence when `stream: true`. This keeps
-the upstream tool loop private while preserving the standard response shape
-expected by the desktop renderer. Approval, workspace, cancellation, and
-MCP routing remain host responsibilities.
-
-For a single integration entry point, use `createGrokCodexRelay()` with the
-Codex fingerprint and the host's existing app-server callback:
-
-```js
-import { createGrokCodexRelay, fingerprint } from "@grok2codex/client-bridge";
-const relay = createGrokCodexRelay({
-  upstream: { baseUrl: process.env.INTERNAL_MODEL_BASE_URL, apiKey: process.env.INTERNAL_MODEL_KEY },
-  codex: { fingerprint: fingerprint({ appServer: "v2", toolRegistry: "current" }), supportsInputSchema: true },
-  grok: { protocol: "responses", model: "grok", supportsClientFunctionCalls: true },
-  registry: [{ fingerprint: fingerprint({ appServer: "v2", toolRegistry: "current" }), adapter: "codex-v2", requiredCapabilities: { supportsInputSchema: true } }],
-  tools,
-  invoke: ({ tool, arguments: args, correlation }) => existingCodexAppServerGateway(tool, args, correlation),
+const relay = createGeminiCodexRelay({
+  upstream: { baseUrl: configuredGeminiEndpoint, apiKey: runtimeCredential },
+  tools: approvedToolCatalog,
+  invoke: invokeThroughExistingApprovalGateway,
 });
 await relay.listen();
 ```
 
-The executor can also be isolated behind a newline-delimited JSON-RPC socket:
+This mode accepts Gemini native `contents` and `functionResponse` messages and uses an explicit host-supplied executor. Its endpoint is `/v1beta/models/:model:generateContent` (or `:streamGenerateContent`). It is not a drop-in replacement for a Responses endpoint. See [the native adapter](gem2codex/README.md).
 
-```js
-import { createJsonRpcSocketClient, createSocketExecutor } from "@grok2codex/client-bridge/socket";
-const rpc = createJsonRpcSocketClient({ connect: () => connectToDesktopRelaySocket() });
-const executor = createSocketExecutor({ rpc, method: "codex/tool/execute" });
-```
+## Responses and errors
 
-Each request carries a stable tool ID, validated arguments, and thread/turn
-correlation. The socket side owns approvals and app-server access; closing or
-timing out the socket fails only the pending tool call.
+- Upstream HTTP failures retain their status and safe diagnostic details. Retry metadata is forwarded when valid; authentication and validation errors must not become generic retryable 502 responses.
+- Responses streaming emits text/function/custom lifecycle events and the actual `completed`, `failed`, or `incomplete` terminal event.
+- Missing or invalid response payloads are errors, not successful empty answers. Cancellation follows the original request.
+- Tool execution, approval, workspace access, and sandbox policy remain with the caller.
 
-Before advertising tools, hosts can perform a capability handshake. The
-fingerprint registry is owned by the bridge package; an unknown Codex
-fingerprint returns `text-only` and never executes a guessed tool schema.
-`onStateChange` exposes the call lifecycle (`DISCOVERED`, `VALIDATED`,
-`APPROVAL_PENDING`, `EXECUTING`, `RESULT_READY`, or `REJECTED`) for the
-renderer and audit sink without exposing tool arguments.
+## Test and deliver
 
-If the host owns the request loop, use `getProviderTools("responses")` or `getProviderTools("chat")` to obtain the correctly shaped declarations. `prepareRequest()` is a convenience that installs the bridge-owned tool list and does not copy arbitrary caller tools into the catalog.
-
-## Boundary rules
-
-The executor remains the source of truth for approvals, workspace roots, sandboxing, cancellation, and auditing. The bridge must be placed between the model transport and that executor; it must not become a second executor. Unknown tools, invalid JSON, schema failures, duplicate names, and unknown fingerprints fail closed.
-
-For catalogs larger than the configured limit, the bridge publishes one `bridge__dispatch` function rather than flattening every namespace into the model request. The dispatcher still resolves only the in-memory approved catalog.
-
-## Development
+Node.js 20 or newer is required. There are no runtime dependencies.
 
 ```sh
 npm test
+npm run release
 ```
 
-The package has no runtime dependencies. Keep provider-specific transports and desktop adapters in the consuming application or separate adapter packages.
+An optional Windows/Linux GitHub Actions configuration is provided in [.github/protocol-tests-template.yml](.github/protocol-tests-template.yml). To enable it, add it as `.github/workflows/ci.yml` using credentials with permission to manage workflows.
 
-### Codex汉化增强版 host adapter
+The release command writes `dist/grok2codex.tar.gz`. It includes both adapters and a fixed `grok2codex-manifest.json` with the package version, entry point, and file hashes. Consumers verify the archive SHA and version and distribute this exact archive. To choose an output file, use `npm run release -- /path/to/grok2codex.tar.gz`.
 
-The optional `./enhanced` entry point is the integration boundary for the
-desktop client. Pass the client's existing model transport as `upstream` and
-its approved tool executor as `invoke`; the adapter never starts Codex,
-opens a second listener, reads credentials, or changes the encrypted bridge.
-Unknown fingerprints remain text-only through the normal capability
-negotiation path.
+The archive keeps the existing name and `src/index.mjs` entry point for desktop compatibility. Source changes belong in this repository; generated archives and installed copies are not editing targets.
 
-The adapter is enabled only for a selected model whose ID starts with `grok`.
-Pass `enabled: false` from the desktop settings to force the existing model
-path; non-Grok models are disabled automatically and receive no bridge tool
-catalog.
+## Protocol references
 
-## Scope and licensing
+- [OpenAI function and custom tools](https://developers.openai.com/api/docs/guides/function-calling)
+- [OpenAI Responses streaming events](https://developers.openai.com/api/reference/resources/responses/streaming-events)
+- [Gemini function calling](https://ai.google.dev/gemini-api/docs/function-calling)
+- [Gemini generateContent](https://ai.google.dev/api/generate-content)
 
-This repository is an independent protocol/client library. It contains no vendor credentials, private URLs, internal paths, copied application code, or project-specific deployment configuration. It is released under the MIT License.
+MIT licensed. This standalone library contains no desktop application source, private service configuration, or credentials.
