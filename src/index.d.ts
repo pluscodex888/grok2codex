@@ -48,3 +48,7 @@ export function isGrokModel(model: unknown): boolean;
 export interface ClientToolPassthroughOptions { transport: Pick<BridgeTransport, "complete" | "stream">; nativeTools?: ReadonlyArray<Record<string, unknown>>; onResponse?(event: { status?: "failed" | "incomplete"; calls: Array<{ type: string; name: string; namespace?: string; callId: string }> }): void; }
 export function createResponsesToolCodec(request: Record<string, any>, options?: Pick<ClientToolPassthroughOptions, "nativeTools">): { request: Record<string, any>; restoreItem(item: Record<string, any>, partial?: boolean): Record<string, any>; restore(response: Record<string, any>): Record<string, any> };
 export function createClientToolPassthrough(options: ClientToolPassthroughOptions): TurnBridge;
+export { CLAUDE_DEFAULT_MODEL, isClaudeModel, prepareClaudeRequest, createClaudeToolPassthrough } from "../claude2codex/src/index.js";
+export type { ClaudeToolPassthroughOptions } from "../claude2codex/src/index.js";
+export { createClaudeCodexRelay } from "../claude2codex/src/integration.js";
+export type { ClaudeCodexRelayOptions } from "../claude2codex/src/integration.js";

@@ -9,9 +9,12 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const pkg = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8'));
 const geminiPkg = JSON.parse(readFileSync(resolve(root, 'gem2codex/package.json'), 'utf8'));
 if (geminiPkg.version !== pkg.version || geminiPkg.private !== true) throw new Error('Gemini must share the root release version and remain privately packaged');
+const claudePkg = JSON.parse(readFileSync(resolve(root, 'claude2codex/package.json'), 'utf8'));
+if (claudePkg.version !== pkg.version || claudePkg.private !== true) throw new Error('Claude must share the root release version and remain privately packaged');
 const sourceFiles = directory => readdirSync(resolve(root, directory)).filter(n => /\.(mjs|ts)$/.test(n)).map(n => `${directory}/${n}`);
 const paths = ['LICENSE', 'README.md', 'CHANGELOG.md', 'package.json', ...sourceFiles('src'),
-  'gem2codex/LICENSE', 'gem2codex/README.md', 'gem2codex/package.json', ...sourceFiles('gem2codex/src')].sort();
+  'gem2codex/LICENSE', 'gem2codex/README.md', 'gem2codex/package.json', ...sourceFiles('gem2codex/src'),
+  'claude2codex/README.md', 'claude2codex/package.json', ...sourceFiles('claude2codex/src')].sort();
 const files = paths.map(path => ({ path, data: readFileSync(resolve(root, path)) }));
 const manifest = { schemaVersion: 1, name: pkg.name, version: pkg.version, entry: 'src/index.mjs', files: Object.fromEntries(files.map(f => [f.path, createHash('sha256').update(f.data).digest('hex')])) };
 files.unshift({ path: 'grok2codex-manifest.json', data: Buffer.from(JSON.stringify(manifest, null, 2) + '\n') });

@@ -1,0 +1,8 @@
+{
+  "name": "@grok2codex/claude-adapter",
+  "version": "0.4.0",
+  "private": true,
+  "type": "module",
+  "description": "Claude client-owned Codex tools through Responses-compatible model gateways.",
+  "license": "MIT"
+}

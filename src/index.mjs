@@ -355,3 +355,5 @@ export { createGrokCodexRelay } from "./integration.mjs";
 export { createJsonRpcSocketClient, createSocketExecutor } from "./socket.mjs";
 export { createEnhancedDesktopRelay, isGrokModel } from "./enhanced.mjs";
 export { createClientToolPassthrough, createResponsesToolCodec } from "./passthrough.mjs";
+export { CLAUDE_DEFAULT_MODEL, isClaudeModel, prepareClaudeRequest, createClaudeToolPassthrough } from "../claude2codex/src/index.mjs";
+export { createClaudeCodexRelay } from "../claude2codex/src/integration.mjs";

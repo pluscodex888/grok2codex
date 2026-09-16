@@ -1,6 +1,6 @@
-# Grok / Gemini client tool bridge
+# Grok / Gemini / Claude client tool bridge
 
-One repository and one versioned package for client-owned tool calls. The OpenAI-compatible Responses adapter supports Grok and Gemini model routes; the Gemini native adapter supports `generateContent` and `streamGenerateContent`.
+One repository and one versioned package for client-owned tool calls. The OpenAI-compatible Responses adapter supports Grok, Gemini, and Claude model routes; the Gemini native adapter supports `generateContent` and `streamGenerateContent`.
 
 The host owns model credentials, approvals, sandboxing, MCP, and tool execution. This library translates requests, tool names, call IDs, and results. It never starts a shell or obtains credentials from the machine.
 
@@ -13,7 +13,8 @@ The host owns model credentials, approvals, sandboxing, MCP, and tool execution.
 | `src/http-errors.mjs` | Shared upstream status, error details, and retry metadata |
 | `src/index.mjs`, `src/codex.mjs`, `src/socket.mjs` | Tool catalog and optional host-supplied executor APIs |
 | `gem2codex/src/` | Gemini native protocol adapter |
-| `test/`, `gem2codex/test/` | Protocol and delivery regressions |
+| `claude2codex/src/` | Claude Responses tool bridge, including Antigravity Opus 4.6 |
+| `test/`, `gem2codex/test/`, `claude2codex/test/` | Protocol and delivery regressions |
 | `scripts/release.mjs` | Deterministic archive and file manifest |
 
 `gem2codex/` is maintained here and shipped with the root package. Its package metadata is private to prevent accidental independent publication. Existing root import paths remain available; native Gemini APIs are exposed under `@grok2codex/client-bridge/gemini` and its `/http`, `/server`, and `/relay` subpaths.
@@ -58,6 +59,12 @@ HTTP errors before the first event retain their status. Provider SSE errors and 
 
 If an upstream ignores `stream: true` and returns JSON, that single response is converted to SSE without a second request. The autonomous executor loop and Gemini native adapter retain their existing behavior; this change applies to the shared Grok/Gemini Responses passthrough. Shipping this library does not update a host application's embedded archive: the host must adopt and verify the new version.
 
+## Claude through a Responses gateway
+
+Use `createClaudeCodexRelay` from `@grok2codex/client-bridge/claude/relay` with the host's existing authenticated model endpoint. The default Antigravity catalog ID is `claude-opus-4-6-thinking`; select the exact model and pool exposed by the server. It reuses the streaming tool codec, preserves opaque reasoning history, and adds no Grok image tool. See [Claude setup and the official protocol references](claude2codex/README.md).
+
+Claude is delivered in the same archive and version. Hosts must adopt that archive and add Claude model-family routing/settings; this library does not modify or restart an installed client.
+
 ## Gemini native API
 
 ```js
@@ -92,7 +99,7 @@ npm run release
 
 An optional Windows/Linux GitHub Actions configuration is provided in [.github/protocol-tests-template.yml](.github/protocol-tests-template.yml). To enable it, add it as `.github/workflows/ci.yml` using credentials with permission to manage workflows.
 
-The release command writes `dist/grok2codex.tar.gz`. It includes both adapters and a fixed `grok2codex-manifest.json` with the package version, entry point, and file hashes. Consumers verify the archive SHA and version and distribute this exact archive. To choose an output file, use `npm run release -- /path/to/grok2codex.tar.gz`.
+The release command writes `dist/grok2codex.tar.gz`. It includes all three model-family modules and a fixed `grok2codex-manifest.json` with the package version, entry point, and file hashes. Consumers verify the archive SHA and version and distribute this exact archive. To choose an output file, use `npm run release -- /path/to/grok2codex.tar.gz`.
 
 The archive keeps the existing name and `src/index.mjs` entry point for desktop compatibility. Source changes belong in this repository; generated archives and installed copies are not editing targets.
 

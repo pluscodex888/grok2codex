@@ -1,6 +1,6 @@
 {
   "name": "@codex-bridge/gem2codex",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
   "description": "Gemini generateContent to an approved Codex tool-chain bridge",
   "type": "module",

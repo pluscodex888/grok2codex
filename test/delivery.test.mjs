@@ -11,7 +11,7 @@ import { gunzipSync } from 'node:zlib';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const sha256 = bytes => createHash('sha256').update(bytes).digest('hex');
 
-test('one release archive contains both usable adapters and every declared entry point', async () => {
+test('one release archive contains all model modules and every declared entry point', async () => {
   const temporaryRoot = resolve(tmpdir());
   const temporary = mkdtempSync(join(temporaryRoot, 'grok2codex-delivery-'));
   try {
@@ -49,10 +49,13 @@ test('one release archive contains both usable adapters and every declared entry
     const manifest = JSON.parse(entries.get('grok2codex-manifest.json'));
     const pkg = JSON.parse(entries.get('package.json'));
     const nativePkg = JSON.parse(entries.get('gem2codex/package.json'));
+    const claudePkg = JSON.parse(entries.get('claude2codex/package.json'));
     assert.equal(manifest.entry, 'src/index.mjs');
     assert.equal(manifest.version, pkg.version);
     assert.equal(nativePkg.version, pkg.version);
     assert.equal(nativePkg.private, true);
+    assert.equal(claudePkg.version, pkg.version);
+    assert.equal(claudePkg.private, true);
     assert.equal(manifest.name, '@grok2codex/client-bridge');
     assert.equal(entries.size, Object.keys(manifest.files).length + 1);
     for (const [name, digest] of Object.entries(manifest.files)) {
@@ -68,9 +71,18 @@ test('one release archive contains both usable adapters and every declared entry
     }
     const api = await import(pathToFileURL(join(extracted, manifest.entry)).href);
     assert.equal(api.createHandshake({ codex: { fingerprint: 'delivery-fixture' } }).bridgeVersion, pkg.version);
-    for (const name of ['createClientToolPassthrough', 'createResponsesToolCodec', 'createEnhancedDesktopRelay', 'isGrokModel']) {
+    for (const name of ['createClientToolPassthrough', 'createResponsesToolCodec', 'createEnhancedDesktopRelay', 'isGrokModel', 'createClaudeToolPassthrough', 'createClaudeCodexRelay', 'isClaudeModel']) {
       assert.equal(typeof api[name], 'function', name);
     }
+    const claude = await import(pathToFileURL(join(extracted, 'claude2codex/src/integration.mjs')).href);
+    let forwarded;
+    const claudeRelay = claude.createClaudeCodexRelay({ upstream: { baseUrl: 'https://fixture.invalid', fetchImpl: async (url, init) => {
+      forwarded = JSON.parse(init.body);
+      return new Response(JSON.stringify({ id: 'resp_delivery', status: 'completed', output: [{ type: 'message', content: [{ type: 'output_text', text: 'Claude delivered' }] }] }));
+    } } });
+    const claudeResult = await claudeRelay.bridge.runTurn({ request: { input: 'fixture' } });
+    assert.equal(forwarded.model, 'claude-opus-4-6-thinking');
+    assert.equal(claudeResult.output[0].content[0].text, 'Claude delivered');
     const nativeHttp = await import(pathToFileURL(join(extracted, 'gem2codex/src/gemini-http.mjs')).href);
     const transport = nativeHttp.createGeminiTransport({
       baseUrl: 'https://gemini.example',

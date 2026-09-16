@@ -1,7 +1,7 @@
 {
   "name": "@grok2codex/client-bridge",
-  "version": "0.3.0",
-  "description": "Shared client tool bridge with OpenAI-compatible Responses and Gemini native protocol adapters.",
+  "version": "0.4.0",
+  "description": "Shared Grok, Gemini, and Claude client tool bridge for Codex, with streaming Responses and Gemini native adapters.",
   "type": "module",
   "exports": {
     ".": {
@@ -48,14 +48,22 @@
       "types": "./gem2codex/src/integration.d.ts",
       "import": "./gem2codex/src/integration.mjs"
     },
+    "./claude": {
+      "types": "./claude2codex/src/index.d.ts",
+      "import": "./claude2codex/src/index.mjs"
+    },
+    "./claude/relay": {
+      "types": "./claude2codex/src/integration.d.ts",
+      "import": "./claude2codex/src/integration.mjs"
+    },
     "./socket": {
       "types": "./src/index.d.ts",
       "import": "./src/socket.mjs"
     }
   },
-  "files": ["src", "gem2codex/src", "gem2codex/package.json", "gem2codex/README.md", "gem2codex/LICENSE", "README.md", "CHANGELOG.md", "LICENSE"],
+  "files": ["src", "gem2codex/src", "gem2codex/package.json", "gem2codex/README.md", "gem2codex/LICENSE", "claude2codex/src", "claude2codex/package.json", "claude2codex/README.md", "README.md", "CHANGELOG.md", "LICENSE"],
   "scripts": {
-    "test": "node --test test/*.test.mjs gem2codex/test/*.test.mjs",
+    "test": "node --test test/*.test.mjs gem2codex/test/*.test.mjs claude2codex/test/*.test.mjs",
     "release": "node scripts/release.mjs"
   },
   "engines": {

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.4.0
+
+- Add `claude2codex` to the shared release, with typed `/claude` and `/claude/relay` exports and root helpers.
+- Default the Claude Responses relay to the Antigravity catalog ID `claude-opus-4-6-thinking`, while retaining explicitly selected Claude model IDs and the host's authenticated transport/card-pool routing.
+- Reuse incremental streaming, namespaced/custom tool conversion, client-owned execution, cancellation and original error propagation; do not inject Grok image tools.
+- Request and preserve opaque reasoning continuation data, with no provider signature fabrication or manual-thinking overrides.
+- Preserve the original Anthropic SSE overload frame and classify its supplementary failed terminal for native Codex's model-capacity display.
+- Document Claude/Codex protocol references and the separate client integration step; validate streaming tools, real tool-result continuation, HTTP/SSE failures, and the combined delivery archive.
+
 ## 0.3.0
 
 - Stream Grok and Gemini Responses incrementally from upstream through the client-owned tool passthrough, including text, reasoning, function arguments, and native image progress.

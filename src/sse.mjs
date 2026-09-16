@@ -44,10 +44,15 @@ export function rewriteSseFrame(frame, value) {
 }
 
 export function failedSseFrame(error, response = {}, sequence = 0, source) {
+  // Anthropic SSE errors carry a type rather than a Responses error code.
+  // Keep the original frame/type/message intact; classify only this additional
+  // compatibility terminal so native Codex can stop retrying a busy model.
+  const responseError = error?.type === "overloaded_error" && !error.code
+    ? { ...error, code: "server_is_overloaded" } : error;
   return rewriteSseFrame(source, { type: "response.failed", sequence_number: sequence,
     response: { id: response.id || `resp_${randomUUID().replaceAll("-", "")}`, object: "response",
       created_at: response.created_at ?? Math.floor(Date.now() / 1000), model: response.model,
-      status: "failed", output: [], error, incomplete_details: null } });
+      status: "failed", output: [], error: responseError, incomplete_details: null } });
 }
 
 /** Incremental UTF-8/SSE parser. Memory is bounded per frame, not per response. */
