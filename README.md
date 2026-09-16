@@ -111,3 +111,21 @@ The archive keeps the existing name and `src/index.mjs` entry point for desktop 
 - [Gemini generateContent](https://ai.google.dev/api/generate-content)
 
 MIT licensed. This standalone library contains no desktop application source, private service configuration, or credentials.
+# Request-scoped session identity
+
+Version 0.4.1 preserves explicit conversation identity through the shared
+Grok/Gemini/Claude Responses bridge. The local HTTP server reads `Session_id`
+(also `Session-Id`, `X-Codex-Session-Id`, `X-Codex-Thread-Id`, `X-Session-Id`,
+and OpenAI conversation-header aliases), then explicit session/thread/conversation
+fields in the body or its metadata. Headers take precedence over body metadata.
+Each upstream HTTP request receives the canonical `Session_id` header. Both
+streaming and non-streaming requests, including tool-result continuations, use
+the same request-scoped path. Direct callers may pass `sessionId` in `runTurn`
+or transport inputs.
+
+The bridge does not derive IDs from prompt text, cache keys, previous response
+IDs, or global state. Missing identity remains absent; the caller must supply a
+real conversation ID. Invalid or ambiguous IDs fail before upstream dispatch.
+Client Authorization/Cookie/identity assertion headers are not forwarded.
+This is relay transport metadata, not a new field in a provider's JSON schema.
+Gemini's native generateContent adapter is separate from this Responses path.

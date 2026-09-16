@@ -16,11 +16,11 @@ export interface ToolDefinition {
 export interface ToolCall { vendorCallId: string; wireName: string; argumentsJson: string; }
 export interface ToolResult { vendorCallId: string; ok: boolean; outputJson: string; errorCode?: string; }
 export interface StreamFrame { raw: string; event?: string; data?: string; value?: Record<string, any>; numbers?: Map<string, string>; }
-export interface BridgeTransport { complete(input: { protocol: Protocol; request: unknown; tools?: ToolDefinition[] }, signal?: AbortSignal): Promise<any>; stream?(input: { protocol: Protocol; request: unknown }, signal?: AbortSignal): AsyncIterable<StreamFrame | { buffered: Record<string, any> }>; }
+export interface BridgeTransport { complete(input: { protocol: Protocol; request: unknown; sessionId?: string; tools?: ToolDefinition[] }, signal?: AbortSignal): Promise<any>; stream?(input: { protocol: Protocol; request: unknown; sessionId?: string }, signal?: AbortSignal): AsyncIterable<StreamFrame | { buffered: Record<string, any> }>; }
 export interface BridgeExecutor { execute(tool: ToolDefinition, argumentsValue: unknown, context?: unknown): Promise<unknown>; }
 export interface BridgePolicy { allowTool?(tool: ToolDefinition, argumentsValue: unknown, context?: unknown): boolean | Promise<boolean>; }
 export interface BridgeOptions { transport: BridgeTransport; executor: BridgeExecutor; tools?: ToolDefinition[]; nativeTools?: ReadonlyArray<Record<string, unknown>>; policy?: BridgePolicy; capabilities?: { enabled: boolean; [key: string]: unknown }; maxAdvertisedTools?: number; maxToolCalls?: number; maxToolOutputBytes?: number; maxTurns?: number; onStateChange?(event: { bridgeCallId: string; vendorCallId: string; state: string; [key: string]: unknown }): void; }
-export interface RunTurnOptions { protocol?: Protocol; request: unknown; context?: unknown; signal?: AbortSignal; }
+export interface RunTurnOptions { protocol?: Protocol; request: unknown; sessionId?: string; context?: unknown; signal?: AbortSignal; }
 export class BridgeError extends Error { constructor(code: BridgeErrorCode, message: string, details?: Record<string, unknown>); code: BridgeErrorCode; details: Record<string, unknown>; }
 export function createBridge(options: BridgeOptions): { getToolDefinitions(): ToolDefinition[]; getProviderTools(protocol?: Protocol): unknown[]; prepareRequest(protocol: Protocol, request: unknown): any; executeCalls(calls: ToolCall[], context?: unknown): Promise<ToolResult[]>; setTools(definitions: ToolDefinition[]): unknown; runTurn(options: RunTurnOptions): Promise<any>; };
 export function encodeWireName(namespace: string | undefined, name: string): string;

@@ -1,6 +1,6 @@
 {
   "name": "@grok2codex/client-bridge",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "Shared Grok, Gemini, and Claude client tool bridge for Codex, with streaming Responses and Gemini native adapters.",
   "type": "module",
   "exports": {

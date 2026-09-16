@@ -1,6 +1,7 @@
 import { BridgeError } from "./index.mjs";
 import { safeErrorCode, safeErrorMessage, upstreamHttpError } from "./http-errors.mjs";
 import { readSseFrames } from "./sse.mjs";
+import { sessionHeaders } from "./session.mjs";
 
 function asObject(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value) ? value : {};
@@ -73,8 +74,9 @@ export function createOpenAITransport({
   if (typeof fetchImpl !== "function") throw new BridgeError("configuration", "fetch is required");
   if (!Number.isSafeInteger(maxSSEFrameBytes) || maxSSEFrameBytes <= 0) throw new BridgeError("configuration", "maxSSEFrameBytes must be a positive integer");
   return {
-    async *stream({ protocol, request }, signal) {
+    async *stream({ protocol, request, sessionId }, signal) {
       if (protocol !== "responses") throw new BridgeError("protocol", "Streaming transport requires Responses");
+      const scopedHeaders = sessionHeaders(headers, sessionId, request);
       const controller = new AbortController();
       let abortKind;
       const abort = () => {
@@ -89,7 +91,7 @@ export function createOpenAITransport({
       }, timeoutMs);
       signal?.addEventListener("abort", abort, { once: true });
       const requestHeaders = new Headers({ "content-type": "application/json",
-        ...(apiKey ? { authorization: `Bearer ${apiKey}` } : {}), ...headers });
+        ...(apiKey ? { authorization: `Bearer ${apiKey}` } : {}), ...scopedHeaders });
       requestHeaders.set("accept", "text/event-stream");
       const secrets = [apiKey, ...Array.from(requestHeaders)
         .filter(([key]) => /authorization|key|token|cookie|secret/i.test(key))
@@ -133,10 +135,11 @@ export function createOpenAITransport({
         signal?.removeEventListener("abort", abort);
       }
     },
-    async complete({ protocol, request }, signal) {
+    async complete({ protocol, request, sessionId }, signal) {
       if (protocol !== "responses" && protocol !== "chat") {
         throw new BridgeError("protocol", `unsupported protocol: ${protocol}`);
       }
+      const scopedHeaders = sessionHeaders(headers, sessionId, request);
       const controller = new AbortController();
       const onAbort = () => controller.abort(signal?.reason);
       const timer = setTimeout(() => controller.abort(new Error("upstream timeout")), timeoutMs);
@@ -149,7 +152,7 @@ export function createOpenAITransport({
           accept: "application/json",
           "content-type": "application/json",
           ...(apiKey ? { authorization: `Bearer ${apiKey}` } : {}),
-          ...headers,
+          ...scopedHeaders,
         };
         const response = await fetchImpl(joinUrl(baseUrl, path), {
           method: "POST",

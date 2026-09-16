@@ -10,7 +10,7 @@ export function createGrokCodexRelay({
   upstream,
   codex,
   grok = {},
-  bridgeVersion = "0.4.0",
+  bridgeVersion = "0.4.1",
   registry = [],
   tools = [],
   invoke,

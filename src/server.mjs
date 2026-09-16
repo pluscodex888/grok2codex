@@ -1,4 +1,5 @@
 import { createServer } from "node:http";
+import { resolveSessionId } from "./session.mjs";
 import { once } from "node:events";
 import { responseSse } from "./response-events.mjs";
 import { failedSseFrame, rewriteSseFrame } from "./sse.mjs";
@@ -70,7 +71,7 @@ export function createBridgeServer({
       if (!requestBridge || typeof requestBridge.runTurn !== "function") {
         throw new BridgeError("configuration", "bridgeForRequest must return a bridge");
       }
-      const options = { protocol, request: { ...body, model: body.model || model }, context: typeof context === "function" ? await context(req, body) : context, signal: requestAbort.signal };
+      const options = { protocol, request: { ...body, model: body.model || model }, sessionId: resolveSessionId(req.headers, body), context: typeof context === "function" ? await context(req, body) : context, signal: requestAbort.signal };
       if (body.stream === true && protocol === "responses" && typeof requestBridge.streamTurn === "function") {
         for await (const frame of requestBridge.streamTurn(options)) {
           requestAbort.signal.throwIfAborted();

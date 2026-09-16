@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.1
+
+- Preserve each request's explicit conversation ID across the shared Grok,
+  Gemini and Claude Responses tool bridge, including streaming and tool results.
+- Forward a canonical `Session_id` header without sharing mutable session state
+  or forwarding client credentials. Never infer conversation identity from
+  prompt text or `prompt_cache_key`.
+
 ## 0.4.0
 
 - Add `claude2codex` to the shared release, with typed `/claude` and `/claude/relay` exports and root helpers.

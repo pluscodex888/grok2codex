@@ -114,16 +114,16 @@ export function createClientToolPassthrough({ transport, onResponse, nativeTools
   if (typeof transport?.complete !== "function") throw new BridgeError("configuration", "transport.complete is required");
   return {
     ...(typeof transport.stream === "function" ? {
-      streamTurn({ protocol = "responses", request, signal }) {
+      streamTurn({ protocol = "responses", request, signal, sessionId }) {
         if (protocol !== "responses") throw new BridgeError("protocol", "client tool passthrough requires Responses");
         const codec = createResponsesToolCodec(request, { nativeTools });
-        return streamClientResponses(transport.stream({ protocol, request: codec.request }, signal), codec, onResponse);
+        return streamClientResponses(transport.stream({ protocol, request: codec.request, sessionId }, signal), codec, onResponse);
       },
     } : {}),
-    async runTurn({ protocol = "responses", request, signal }) {
+    async runTurn({ protocol = "responses", request, signal, sessionId }) {
       if (protocol !== "responses") throw new BridgeError("protocol", "client tool passthrough requires Responses");
       const codec = createResponsesToolCodec(request, { nativeTools });
-      const upstream = await transport.complete({ protocol, request: codec.request }, signal);
+      const upstream = await transport.complete({ protocol, request: codec.request, sessionId }, signal);
       const result = codec.restore(upstream);
       const unsuccessfulStatus = unsuccessfulResponseStatus(result);
       onResponse?.({ ...(unsuccessfulStatus ? { status: unsuccessfulStatus } : {}),
