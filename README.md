@@ -46,6 +46,18 @@ Use the host's configured model endpoint, including its existing authenticated t
 
 Namespaces and custom text tools are translated into function declarations, then restored with their original names, namespaces, raw input, and call IDs. Stable wire names fit Gemini's 64-character limit. Historical tools are translated for context without becoming newly executable tools. Text/code blocks remain text and are never synthesized into tool calls.
 
+### Genuine Responses streaming (0.3.0)
+
+With the setup above, `POST /v1/responses` with `stream: true` now sends `stream: true` upstream and forwards SSE events as they arrive. Text, reasoning, native image progress, and function argument deltas no longer wait for the entire response. Explicit `stream: false` calls still return one JSON response.
+
+The transport exposes `stream()` and the passthrough exposes `streamTurn()`. Pass the complete bridge object to `createBridgeServer`, including when using `bridgeForRequest`; a host wrapper that retains only `runTurn()` uses the previous buffered path. Custom transports can implement the optional streaming method. Existing complete-only transports remain compatible.
+
+Tool names, namespaces, call IDs, and raw custom input are restored before delivery. Function/custom completion events are held until the upstream confirms `response.completed`, so a failed generation cannot execute an unfinished tool call. Text and reasoning continue streaming while tool completion is pending.
+
+HTTP errors before the first event retain their status. Provider SSE errors and failed/incomplete terminal events retain their original details; an error without a terminal event also receives a compatible `response.failed` carrying that error. An unexplained early EOF becomes `upstream_stream_incomplete`, never a successful empty answer. The bridge performs no automatic retry. Client cancellation closes upstream, writes respect downstream backpressure, and the existing `timeoutMs` still limits the whole upstream request.
+
+If an upstream ignores `stream: true` and returns JSON, that single response is converted to SSE without a second request. The autonomous executor loop and Gemini native adapter retain their existing behavior; this change applies to the shared Grok/Gemini Responses passthrough. Shipping this library does not update a host application's embedded archive: the host must adopt and verify the new version.
+
 ## Gemini native API
 
 ```js
@@ -67,6 +79,7 @@ This mode accepts Gemini native `contents` and `functionResponse` messages and u
 - Responses streaming emits text/function/custom lifecycle events and the actual `completed`, `failed`, or `incomplete` terminal event.
 - Missing or invalid response payloads are errors, not successful empty answers. Cancellation follows the original request.
 - Tool execution, approval, workspace access, and sandbox policy remain with the caller.
+- In the streaming path, `onResponse` is an observer; its exceptions do not replace provider terminal events.
 
 ## Test and deliver
 

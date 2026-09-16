@@ -1,5 +1,6 @@
 import { BridgeError } from "./index.mjs";
 import { safeErrorCode, safeErrorMessage, upstreamHttpError } from "./http-errors.mjs";
+import { readSseFrames } from "./sse.mjs";
 
 function asObject(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value) ? value : {};
@@ -67,9 +68,71 @@ export function createOpenAITransport({
   timeoutMs = 120_000,
   responsesPath = "/v1/responses",
   chatPath = "/v1/chat/completions",
+  maxSSEFrameBytes = 32 * 1024 * 1024,
 } = {}) {
   if (typeof fetchImpl !== "function") throw new BridgeError("configuration", "fetch is required");
+  if (!Number.isSafeInteger(maxSSEFrameBytes) || maxSSEFrameBytes <= 0) throw new BridgeError("configuration", "maxSSEFrameBytes must be a positive integer");
   return {
+    async *stream({ protocol, request }, signal) {
+      if (protocol !== "responses") throw new BridgeError("protocol", "Streaming transport requires Responses");
+      const controller = new AbortController();
+      let abortKind;
+      const abort = () => {
+        if (controller.signal.aborted) return;
+        abortKind = "cancelled";
+        controller.abort(signal?.reason);
+      };
+      const timer = setTimeout(() => {
+        if (controller.signal.aborted) return;
+        abortKind = "timeout";
+        controller.abort(new Error("upstream timeout"));
+      }, timeoutMs);
+      signal?.addEventListener("abort", abort, { once: true });
+      const requestHeaders = new Headers({ "content-type": "application/json",
+        ...(apiKey ? { authorization: `Bearer ${apiKey}` } : {}), ...headers });
+      requestHeaders.set("accept", "text/event-stream");
+      const secrets = [apiKey, ...Array.from(requestHeaders)
+        .filter(([key]) => /authorization|key|token|cookie|secret/i.test(key))
+        .map(([, value]) => String(value))].filter(Boolean);
+      try {
+        if (signal?.aborted) abort();
+        controller.signal.throwIfAborted();
+        const response = await fetchImpl(joinUrl(baseUrl, responsesPath), {
+          method: "POST", headers: requestHeaders,
+          body: JSON.stringify({ ...asObject(request), stream: true }), signal: controller.signal,
+        });
+        const sse = /^text\/event-stream(?:;|$)/i.test(response.headers.get("content-type") ?? "");
+        if (!response.ok || !sse) {
+          const text = await response.text();
+          controller.signal.throwIfAborted();
+          let body;
+          try { body = JSON.parse(text); } catch {
+            if (response.ok) throw new BridgeError("upstream_invalid_response", "Upstream returned neither SSE nor JSON");
+          }
+          if (!response.ok) {
+            const details = upstreamHttpError(response, body, { secrets });
+            throw new BridgeError("upstream", details.message, details);
+          }
+          // Legacy providers may ignore stream=true. Preserve compatibility
+          // with that one response, without retrying or double billing.
+          yield { buffered: normalizeResponsesBody(body, { secrets }) };
+          return;
+        }
+        yield* readSseFrames(response.body, maxSSEFrameBytes);
+      } catch (error) {
+        if (controller.signal.aborted) {
+          const timeout = abortKind === "timeout";
+          throw new BridgeError(timeout ? "timeout" : "cancelled", timeout ? "Upstream request timed out" : "Request was cancelled",
+            { status: timeout ? 504 : 499 });
+        }
+        if (error instanceof BridgeError) throw error;
+        throw new BridgeError("upstream", safeErrorMessage(String(error), secrets) ?? "Upstream stream failed");
+      } finally {
+        controller.abort();
+        clearTimeout(timer);
+        signal?.removeEventListener("abort", abort);
+      }
+    },
     async complete({ protocol, request }, signal) {
       if (protocol !== "responses" && protocol !== "chat") {
         throw new BridgeError("protocol", `unsupported protocol: ${protocol}`);

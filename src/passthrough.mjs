@@ -1,4 +1,5 @@
 import { BridgeError, encodeWireName } from "./index.mjs";
+import { streamClientResponses } from "./responses-stream.mjs";
 
 function unsuccessfulResponseStatus(response) {
   if (response?.error || response?.status === "failed") return "failed";
@@ -79,28 +80,31 @@ export function createResponsesToolCodec(request, { nativeTools = [] } = {}) {
     const record = byOriginal.get(originalKey(request.tool_choice.name, request.tool_choice.namespace));
     if (record) outgoing.tool_choice = { type: "function", name: record.wireName };
   }
+  const restoreItem = (item, partial = false) => {
+    if (item.type !== "function_call") return item;
+    const record = byWire.get(item.name);
+    if (!record) throw new BridgeError("invalid_tool_call", `unadvertised tool: ${item.name}`);
+    const { arguments: raw, ...rest } = item;
+    const restored = { ...rest, name: record.name };
+    if (record.namespace !== undefined) restored.namespace = record.namespace;
+    if (record.kind === "custom") {
+      if (partial) return { ...restored, type: "custom_tool_call", input: "" };
+      let args;
+      try { args = JSON.parse(raw); } catch { throw new BridgeError("invalid_tool_call", "custom input is not valid JSON"); }
+      if (typeof args?.input !== "string") throw new BridgeError("invalid_tool_call", "custom tool requires a string input");
+      return { ...restored, type: "custom_tool_call", input: args.input };
+    }
+    return { ...restored, arguments: raw };
+  };
   return {
     request: outgoing,
+    restoreItem,
     restore(response) {
       // Failed generations can contain unfinished JSON and unfinished tool
       // names. Preserve that terminal response instead of treating its partial
       // output as a new executable call or replacing the real failure.
       if (unsuccessfulResponseStatus(response)) return structuredClone(response);
-      return { ...response, output: (response.output ?? []).map(item => {
-        if (item.type !== "function_call") return item;
-        const record = byWire.get(item.name);
-        if (!record) throw new BridgeError("invalid_tool_call", `unadvertised tool: ${item.name}`);
-        const { arguments: raw, ...rest } = item;
-        const restored = { ...rest, name: record.name };
-        if (record.namespace !== undefined) restored.namespace = record.namespace;
-        if (record.kind === "custom") {
-          let args;
-          try { args = JSON.parse(raw); } catch { throw new BridgeError("invalid_tool_call", "custom input is not valid JSON"); }
-          if (typeof args?.input !== "string") throw new BridgeError("invalid_tool_call", "custom tool requires a string input");
-          return { ...restored, type: "custom_tool_call", input: args.input };
-        }
-        return { ...restored, arguments: raw };
-      }) };
+      return { ...response, output: (response.output ?? []).map(item => restoreItem(item)) };
     },
   };
 }
@@ -109,6 +113,13 @@ export function createResponsesToolCodec(request, { nativeTools = [] } = {}) {
 export function createClientToolPassthrough({ transport, onResponse, nativeTools = [] } = {}) {
   if (typeof transport?.complete !== "function") throw new BridgeError("configuration", "transport.complete is required");
   return {
+    ...(typeof transport.stream === "function" ? {
+      streamTurn({ protocol = "responses", request, signal }) {
+        if (protocol !== "responses") throw new BridgeError("protocol", "client tool passthrough requires Responses");
+        const codec = createResponsesToolCodec(request, { nativeTools });
+        return streamClientResponses(transport.stream({ protocol, request: codec.request }, signal), codec, onResponse);
+      },
+    } : {}),
     async runTurn({ protocol = "responses", request, signal }) {
       if (protocol !== "responses") throw new BridgeError("protocol", "client tool passthrough requires Responses");
       const codec = createResponsesToolCodec(request, { nativeTools });

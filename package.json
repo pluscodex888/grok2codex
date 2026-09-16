@@ -1,6 +1,6 @@
 {
   "name": "@grok2codex/client-bridge",
-  "version": "0.2.2",
+  "version": "0.3.0",
   "description": "Shared client tool bridge with OpenAI-compatible Responses and Gemini native protocol adapters.",
   "type": "module",
   "exports": {

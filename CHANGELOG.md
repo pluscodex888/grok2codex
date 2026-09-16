@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.0
+
+- Stream Grok and Gemini Responses incrementally from upstream through the client-owned tool passthrough, including text, reasoning, function arguments, and native image progress.
+- Preserve provider SSE error frames, unknown metadata, and failed/incomplete outcomes; append a compatible failed terminal when the provider emits only an error. Detect unexplained early EOF without replaying a request.
+- Restore tool identities and custom raw input; release executable tool completion only after a valid successful terminal response. Keep partial tool parsing from hiding a provider failure.
+- Propagate cancellation, bound SSE frames and pending tool data, and honor downstream backpressure. Keep explicit nonstreaming requests and JSON-only upstreams compatible.
+- Add typed streaming methods and loopback HTTP regressions for both models, interleaved tools, errors, cancellation, and first-delta delivery before generation completes.
+
 ## 0.2.2
 
 - Ship the Responses and Gemini native adapters from one repository, version, and archive, with typed native subpath exports.
