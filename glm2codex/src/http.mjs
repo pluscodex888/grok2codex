@@ -36,7 +36,14 @@ export function isGLMResponsesUnsupported(error) {
   const { status, code, type, message = "", param } = error.details ?? {};
   if (param || /auth|permission|policy|safety|cyber|billing|quota|model|api.?key|access.?denied/i.test(`${code ?? ""} ${type ?? ""} ${message}`)) return false;
   if (status === 400) return ["unsupported_endpoint", "unsupported_protocol", "responses_not_supported"].includes(code);
-  return [404, 405, 501].includes(status) && ["not_found", "route_not_found", "endpoint_not_found", "unsupported_endpoint", "unsupported_protocol", "responses_not_supported", "not_implemented"].includes(code);
+  if (![404, 405, 501].includes(status)) return false;
+  if (["not_found", "route_not_found", "endpoint_not_found", "unsupported_endpoint", "unsupported_protocol", "responses_not_supported", "not_implemented"].includes(code)) return true;
+  // Some OpenAI-compatible gateways (including the overseas GLM endpoint)
+  // return the generic `{code: "upstream_error", message: "Not Found"}`
+  // envelope for an unimplemented Responses route. Treat only this exact
+  // route-level message as protocol absence; model/auth/policy 404s remain
+  // errors and must never be retried through Chat Completions.
+  return status === 404 && code === "upstream_error" && /^not found$/i.test(String(message).trim());
 }
 
 export function createGLMTransport(options = {}) {

@@ -93,6 +93,20 @@ test("ambiguous 404 and conflicting policy classification are not protocol absen
   }
 });
 
+test("generic upstream Not Found for the Responses route falls back to Chat once", async () => {
+  const sent = [];
+  const transport = createGLMTransport({ fetchImpl: async (url, init) => {
+    sent.push({ url, init });
+    return sent.length === 1
+      ? json({ error: { code: "upstream_error", type: "upstream", message: "Not Found" } }, 404)
+      : json(chat);
+  } });
+  const response = await transport.complete(input);
+  assert.equal(sent.length, 2);
+  assert.match(sent[1].url, /\/chat\/completions$/);
+  assert.equal(response.output.find(item => item.type === "message").content[0].text, "done");
+});
+
 test("one total deadline also rejects a late custom fetch that ignores abort", async () => {
   let calls = 0;
   const transport = createGLMTransport({ timeoutMs: 5, fetchImpl: async () => {
