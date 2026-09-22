@@ -1,0 +1,8 @@
+{
+  "name": "@grok2codex/glm-adapter",
+  "version": "0.4.1",
+  "private": true,
+  "type": "module",
+  "description": "GLM and DeepSeek Responses and Chat Completions adapters for client-owned Codex tools.",
+  "license": "MIT"
+}

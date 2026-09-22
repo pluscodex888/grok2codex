@@ -50,12 +50,15 @@ test('one release archive contains all model modules and every declared entry po
     const pkg = JSON.parse(entries.get('package.json'));
     const nativePkg = JSON.parse(entries.get('gem2codex/package.json'));
     const claudePkg = JSON.parse(entries.get('claude2codex/package.json'));
+    const glmPkg = JSON.parse(entries.get('glm2codex/package.json'));
     assert.equal(manifest.entry, 'src/index.mjs');
     assert.equal(manifest.version, pkg.version);
     assert.equal(nativePkg.version, pkg.version);
     assert.equal(nativePkg.private, true);
     assert.equal(claudePkg.version, pkg.version);
     assert.equal(claudePkg.private, true);
+    assert.equal(glmPkg.version, pkg.version);
+    assert.equal(glmPkg.private, true);
     assert.equal(manifest.name, '@grok2codex/client-bridge');
     assert.equal(entries.size, Object.keys(manifest.files).length + 1);
     for (const [name, digest] of Object.entries(manifest.files)) {
@@ -71,7 +74,7 @@ test('one release archive contains all model modules and every declared entry po
     }
     const api = await import(pathToFileURL(join(extracted, manifest.entry)).href);
     assert.equal(api.createHandshake({ codex: { fingerprint: 'delivery-fixture' } }).bridgeVersion, pkg.version);
-    for (const name of ['createClientToolPassthrough', 'createResponsesToolCodec', 'createEnhancedDesktopRelay', 'isGrokModel', 'createClaudeToolPassthrough', 'createClaudeCodexRelay', 'isClaudeModel']) {
+    for (const name of ['createClientToolPassthrough', 'createResponsesToolCodec', 'createEnhancedDesktopRelay', 'isGrokModel', 'createClaudeToolPassthrough', 'createClaudeCodexRelay', 'isClaudeModel', 'createGLMToolPassthrough', 'createGLMCodexRelay', 'createGLMTransport', 'createDeepSeekCodexRelay', 'createDeepSeekToolPassthrough', 'createDeepSeekTransport']) {
       assert.equal(typeof api[name], 'function', name);
     }
     const claude = await import(pathToFileURL(join(extracted, 'claude2codex/src/integration.mjs')).href);

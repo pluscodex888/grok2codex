@@ -1,6 +1,8 @@
-# Grok / Gemini / Claude client tool bridge
+# Grok / Gemini / Claude / GLM / DeepSeek client tool bridge
 
 One repository and one versioned package for client-owned tool calls. The OpenAI-compatible Responses adapter supports Grok, Gemini, and Claude model routes; the Gemini native adapter supports `generateContent` and `streamGenerateContent`.
+
+The [glm2codex adapters](glm2codex/README.md) add GLM and DeepSeek tool-chain mapping, native Responses preference and capability-checked Chat fallback. Their client-facing protocol remains Responses; protocol adaptation does not execute tools or change model-selection/billing policy.
 
 The host owns model credentials, approvals, sandboxing, MCP, and tool execution. This library translates requests, tool names, call IDs, and results. It never starts a shell or obtains credentials from the machine.
 
@@ -14,6 +16,7 @@ The host owns model credentials, approvals, sandboxing, MCP, and tool execution.
 | `src/index.mjs`, `src/codex.mjs`, `src/socket.mjs` | Tool catalog and optional host-supplied executor APIs |
 | `gem2codex/src/` | Gemini native protocol adapter |
 | `claude2codex/src/` | Claude Responses tool bridge, including Antigravity Opus 4.6 |
+| `glm2codex/src/` | GLM and DeepSeek Responses/tool adapters and controlled Chat fallback |
 | `test/`, `gem2codex/test/`, `claude2codex/test/` | Protocol and delivery regressions |
 | `scripts/release.mjs` | Deterministic archive and file manifest |
 
@@ -99,7 +102,7 @@ npm run release
 
 An optional Windows/Linux GitHub Actions configuration is provided in [.github/protocol-tests-template.yml](.github/protocol-tests-template.yml). To enable it, add it as `.github/workflows/ci.yml` using credentials with permission to manage workflows.
 
-The release command writes `dist/grok2codex.tar.gz`. It includes all three model-family modules and a fixed `grok2codex-manifest.json` with the package version, entry point, and file hashes. Consumers verify the archive SHA and version and distribute this exact archive. To choose an output file, use `npm run release -- /path/to/grok2codex.tar.gz`.
+The release command writes `dist/grok2codex.tar.gz`. It includes all model-family modules and a fixed `grok2codex-manifest.json` with the package version, entry point, and file hashes. Consumers verify the archive SHA and version and distribute this exact archive. To choose an output file, use `npm run release -- /path/to/grok2codex.tar.gz`.
 
 The archive keeps the existing name and `src/index.mjs` entry point for desktop compatibility. Source changes belong in this repository; generated archives and installed copies are not editing targets.
 

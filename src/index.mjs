@@ -357,3 +357,6 @@ export { createEnhancedDesktopRelay, isGrokModel } from "./enhanced.mjs";
 export { createClientToolPassthrough, createResponsesToolCodec } from "./passthrough.mjs";
 export { CLAUDE_DEFAULT_MODEL, isClaudeModel, prepareClaudeRequest, createClaudeToolPassthrough } from "../claude2codex/src/index.mjs";
 export { createClaudeCodexRelay } from "../claude2codex/src/integration.mjs";
+export { GLM_DEFAULT_MODEL, GLM_MODELS, isGLMModel, prepareGLMRequest, createGLMToolCodec, createGLMToolPassthrough, createGLMTransport, resolveGLMEndpoint, GLM_ENDPOINTS, isGLMResponsesUnsupported } from "../glm2codex/src/index.mjs";
+export { createGLMCodexRelay } from "../glm2codex/src/integration.mjs";
+export { DEEPSEEK_DEFAULT_MODEL, DEEPSEEK_MODELS, isDeepSeekModel, prepareDeepSeekRequest, createDeepSeekTransport, createDeepSeekToolPassthrough, createDeepSeekCodexRelay } from "../glm2codex/src/deepseek.mjs";

@@ -52,3 +52,9 @@ export { CLAUDE_DEFAULT_MODEL, isClaudeModel, prepareClaudeRequest, createClaude
 export type { ClaudeToolPassthroughOptions } from "../claude2codex/src/index.js";
 export { createClaudeCodexRelay } from "../claude2codex/src/integration.js";
 export type { ClaudeCodexRelayOptions } from "../claude2codex/src/integration.js";
+export { GLM_DEFAULT_MODEL, GLM_MODELS, isGLMModel, prepareGLMRequest, createGLMToolCodec, createGLMToolPassthrough, createGLMTransport, resolveGLMEndpoint, GLM_ENDPOINTS, isGLMResponsesUnsupported } from "../glm2codex/src/index.js";
+export type { GLMRequestOptions, GLMCodecOptions, GLMCustomInput, GLMToolPassthroughOptions, GLMTransportOptions } from "../glm2codex/src/index.js";
+export { createGLMCodexRelay } from "../glm2codex/src/integration.js";
+export type { GLMCodexRelayOptions } from "../glm2codex/src/integration.js";
+export { DEEPSEEK_DEFAULT_MODEL, DEEPSEEK_MODELS, isDeepSeekModel, prepareDeepSeekRequest, createDeepSeekTransport, createDeepSeekToolPassthrough, createDeepSeekCodexRelay } from "../glm2codex/src/deepseek.js";
+export type { DeepSeekRequestOptions, DeepSeekTransportOptions, DeepSeekToolPassthroughOptions, DeepSeekCodexRelayOptions } from "../glm2codex/src/deepseek.js";

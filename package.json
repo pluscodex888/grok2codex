@@ -1,7 +1,7 @@
 {
   "name": "@grok2codex/client-bridge",
   "version": "0.4.1",
-  "description": "Shared Grok, Gemini, and Claude client tool bridge for Codex, with streaming Responses and Gemini native adapters.",
+  "description": "Shared Grok, Gemini, Claude, GLM and DeepSeek client tool bridge for Codex, with streaming Responses and native adapters.",
   "type": "module",
   "exports": {
     ".": {
@@ -56,14 +56,30 @@
       "types": "./claude2codex/src/integration.d.ts",
       "import": "./claude2codex/src/integration.mjs"
     },
+    "./glm": {
+      "types": "./glm2codex/src/index.d.ts",
+      "import": "./glm2codex/src/index.mjs"
+    },
+    "./glm/http": {
+      "types": "./glm2codex/src/http.d.ts",
+      "import": "./glm2codex/src/http.mjs"
+    },
+    "./glm/relay": {
+      "types": "./glm2codex/src/integration.d.ts",
+      "import": "./glm2codex/src/integration.mjs"
+    },
+    "./glm/deepseek": {
+      "types": "./glm2codex/src/deepseek.d.ts",
+      "import": "./glm2codex/src/deepseek.mjs"
+    },
     "./socket": {
       "types": "./src/index.d.ts",
       "import": "./src/socket.mjs"
     }
   },
-  "files": ["src", "gem2codex/src", "gem2codex/package.json", "gem2codex/README.md", "gem2codex/LICENSE", "claude2codex/src", "claude2codex/package.json", "claude2codex/README.md", "README.md", "CHANGELOG.md", "LICENSE"],
+  "files": ["src", "gem2codex/src", "gem2codex/package.json", "gem2codex/README.md", "gem2codex/LICENSE", "claude2codex/src", "claude2codex/package.json", "claude2codex/README.md", "glm2codex/src", "glm2codex/package.json", "glm2codex/README.md", "README.md", "CHANGELOG.md", "LICENSE"],
   "scripts": {
-    "test": "node --test test/*.test.mjs gem2codex/test/*.test.mjs claude2codex/test/*.test.mjs",
+    "test": "node --test test/*.test.mjs gem2codex/test/*.test.mjs claude2codex/test/*.test.mjs glm2codex/test/*.test.mjs",
     "release": "node scripts/release.mjs"
   },
   "engines": {
