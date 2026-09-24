@@ -331,11 +331,18 @@ test("Chat conversion rejects opaque response state and unsupported history inst
   ]) expectUnsupported(() => responsesToGLMChat({ ...base, input: [{ role: "user", content: "Task" }, item] }));
 });
 
-test("Chat conversion rejects built-in tools and unsupported images", () => {
+test("Chat conversion drops unavailable web search while retaining local tools", () => {
   const base = { model: "glm-5.3", input: "Task" };
-  for (const type of ["web_search", "file_search", "computer_use_preview", "image_generation"]) {
+  for (const type of ["web_search", "web_search_preview", "web_search_preview_2025_03_11", "web_search_2025_08_26"]) {
+    const webOnly = responsesToGLMChat({ ...base, tools: [{ type }] });
+    assert.equal(webOnly.tools, undefined);
+  }
+  const mixed = responsesToGLMChat({ ...base, tools: [{ type: "web_search" }, functionTool("inspect")] });
+  assert.deepEqual(mixed.tools.map(tool => tool.function.name), ["inspect"]);
+  for (const type of ["file_search", "computer_use_preview", "image_generation"]) {
     expectUnsupported(() => responsesToGLMChat({ ...base, tools: [{ type }] }));
   }
+  expectUnsupported(() => responsesToGLMChat({ ...base, tools: [{ type: "web_search" }], tool_choice: "required" }));
   const imageRequest = { ...base, input: [{ role: "user", content: [
     { type: "input_text", text: "Inspect this fixture" }, { type: "input_image", image_url: "https://example.invalid/fixture.png" },
   ] }] };

@@ -74,7 +74,7 @@ test("business denials, unsupported model and transient faults never downgrade",
 
 test("explicit Responses-only mode and nonportable history never fall back", async () => {
   for (const request of [input.request, { ...input.request, previous_response_id: "resp_foreign" },
-    { ...input.request, tools: [{ type: "web_search" }] }, { ...input.request, store: true }]) {
+    { ...input.request, tools: [{ type: "web_search" }], tool_choice: "required" }, { ...input.request, store: true }]) {
     let calls = 0;
     const transport = createGLMTransport({ ...(request === input.request ? { upstreamProtocol: "responses" } : {}),
       fetchImpl: async () => { calls++; return json({ error: { code: "unsupported_endpoint", message: "Responses unavailable" } }, 404); } });
@@ -105,6 +105,31 @@ test("generic upstream Not Found for the Responses route falls back to Chat once
   assert.equal(sent.length, 2);
   assert.match(sent[1].url, /\/chat\/completions$/);
   assert.equal(response.output.find(item => item.type === "message").content[0].text, "done");
+});
+
+test("sanitized generic upstream 404 for the Responses route falls back to Chat once", async () => {
+  const sent = [];
+  const transport = createGLMTransport({ fetchImpl: async (url, init) => {
+    sent.push({ url, init });
+    return sent.length === 1
+      ? json({ error: { code: "upstream_error", type: "upstream", message: "Upstream request failed (HTTP 404; upstream_error)." } }, 404)
+      : json(chat);
+  } });
+  const response = await transport.complete(input);
+  assert.equal(sent.length, 2);
+  assert.match(sent[1].url, /\/chat\/completions$/);
+  assert.equal(response.output.find(item => item.type === "message").content[0].text, "done");
+});
+
+test("string provider error envelopes still identify an absent Responses route", async () => {
+  const sent = [];
+  const transport = createGLMTransport({ fetchImpl: async (url, init) => {
+    sent.push({ url, init });
+    return sent.length === 1 ? json({ error: "Not Found" }, 404) : json(chat);
+  } });
+  await transport.complete(input);
+  assert.equal(sent.length, 2);
+  assert.match(sent[1].url, /\/chat\/completions$/);
 });
 
 test("one total deadline also rejects a late custom fetch that ignores abort", async () => {

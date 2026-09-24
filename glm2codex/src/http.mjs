@@ -33,17 +33,21 @@ export function resolveGLMEndpoint({ region = "domestic", baseUrl, responsesPath
 /** Only an explicit endpoint/protocol absence permits the single Chat fallback. */
 export function isGLMResponsesUnsupported(error) {
   if (!(error instanceof BridgeError) || error.code !== "upstream") return false;
-  const { status, code, type, message = "", param } = error.details ?? {};
+  const { status, code, type, message = "", param, providerErrorObject } = error.details ?? {};
   if (param || /auth|permission|policy|safety|cyber|billing|quota|model|api.?key|access.?denied/i.test(`${code ?? ""} ${type ?? ""} ${message}`)) return false;
   if (status === 400) return ["unsupported_endpoint", "unsupported_protocol", "responses_not_supported"].includes(code);
   if (![404, 405, 501].includes(status)) return false;
   if (["not_found", "route_not_found", "endpoint_not_found", "unsupported_endpoint", "unsupported_protocol", "responses_not_supported", "not_implemented"].includes(code)) return true;
   // Some OpenAI-compatible gateways (including the overseas GLM endpoint)
-  // return the generic `{code: "upstream_error", message: "Not Found"}`
-  // envelope for an unimplemented Responses route. Treat only this exact
-  // route-level message as protocol absence; model/auth/policy 404s remain
-  // errors and must never be retried through Chat Completions.
-  return status === 404 && code === "upstream_error" && /^not found$/i.test(String(message).trim());
+  // return either `Not Found` or a sanitized generic
+  // `Upstream request failed (HTTP 404; upstream_error).` envelope for an
+  // unimplemented Responses route. Treat only these exact route-level
+  // messages as protocol absence; model/auth/policy 404s remain errors and
+  // must never be retried through Chat Completions.
+  const normalizedMessage = String(message).trim();
+  return status === 404 && code === "upstream_error" && providerErrorObject === true
+    && (/^not found$/i.test(normalizedMessage)
+      || /^upstream request failed \(http 404; upstream_error\)\.?$/i.test(normalizedMessage));
 }
 
 export function createGLMTransport(options = {}) {

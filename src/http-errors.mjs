@@ -39,15 +39,25 @@ export function safeErrorMessage(value, secrets = []) {
 
 export function upstreamHttpError(response, body, { secrets = [] } = {}) {
   const status = errorStatus(response?.status) ?? 502;
+  // Keep a marker for a real provider envelope even when its `error` member
+  // is a string.  An empty/non-object body is still ambiguous and must not
+  // be classified as an absent Responses route by the protocol fallback.
+  const providerErrorObject = Boolean(body && typeof body === "object" && !Array.isArray(body)
+    && Object.keys(body).length > 0);
   const error = body?.error && typeof body.error === "object" ? body.error : {};
-  const code = safeErrorCode(error.code) ?? safeErrorCode(error.type) ?? "upstream_error";
+  // xAI can return { code, error: "message" } instead of a nested error object.
+  // Preserve the provider's reason without reclassifying the HTTP status.
+  const code = safeErrorCode(error.code) ?? safeErrorCode(error.type)
+    ?? safeErrorCode(body?.code) ?? "upstream_error";
   const type = safeErrorCode(error.type) ?? "upstream";
   const param = safeErrorParam(error.param);
   const retryAfter = safeRetryAfter(response?.headers?.get?.("retry-after"));
-  const message = safeErrorMessage(error.message ?? body?.message, secrets);
+  const message = safeErrorMessage(error.message
+    ?? (typeof body?.error === "string" ? body.error : body?.message), secrets);
   return {
     status, code, type,
     message: message ?? `Upstream request failed (HTTP ${status}; ${code}${param ? `; parameter ${param}` : ""}).`,
+    providerErrorObject,
     ...(param ? { param } : {}), ...(retryAfter ? { retryAfter } : {}),
   };
 }

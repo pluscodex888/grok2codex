@@ -23,14 +23,35 @@ export function responsesToGLMChat(request, { stream = false, allowImages = fals
   if (request.text?.format && request.text.format.type !== "text") unsupported("GLM Chat cannot preserve this structured output format");
   if (request.reasoning?.summary && request.reasoning.summary !== "none") unsupported("GLM Chat cannot generate the requested Responses reasoning summary");
   if (request.text?.verbosity !== undefined || request.max_tool_calls !== undefined) unsupported("GLM Chat cannot preserve verbosity or built-in tool execution limits");
-  const tools = (request.tools ?? []).map(tool => {
+  // Responses clients may advertise provider-native web search alongside the
+  // local function/namespace tools that the desktop executes.  GLM Chat does
+  // not implement that native capability; dropping only the unavailable
+  // declaration keeps the local tool catalog usable instead of rejecting the
+  // entire fallback request.  We never claim that web search ran.
+  // Keep this list in sync with the server-side GLM Responses adapter.  The
+  // dated names are emitted by newer OpenAI clients for the same provider
+  // native search capability and are not executable by the GLM Chat API.
+  const unsupportedNativeTools = new Set([
+    "web_search",
+    "web_search_preview",
+    "web_search_preview_2025_03_11",
+    "web_search_2025_08_26",
+  ]);
+  const tools = (request.tools ?? []).flatMap(tool => {
+    if (unsupportedNativeTools.has(tool?.type)) return [];
     if (tool.type !== "function") unsupported(`Cannot preserve built-in tool ${tool.type} in GLM Chat; configure an explicit host adapter`);
     if (!/^[a-zA-Z0-9_-]{1,64}$/.test(tool.name)) invalid("GLM tool wire name must fit 64 safe characters");
-    return { type: "function", function: { name: tool.name, description: tool.description ?? tool.name,
-      parameters: structuredClone(tool.parameters), ...(tool.strict === undefined ? {} : { strict: tool.strict }) } };
+    return [{ type: "function", function: { name: tool.name, description: tool.description ?? tool.name,
+      parameters: structuredClone(tool.parameters), ...(tool.strict === undefined ? {} : { strict: tool.strict }) } }];
   });
   if (tools.length > 128) invalid("GLM supports at most 128 function declarations");
   const choice = request.tool_choice ?? "auto";
+  if (choice && typeof choice === "object" && unsupportedNativeTools.has(choice.type)) {
+    unsupported(`GLM Chat cannot preserve selected built-in tool ${choice.type}`);
+  }
+  if (choice === "required" && (request.tools ?? []).some(tool => unsupportedNativeTools.has(tool?.type)) && !tools.length) {
+    unsupported("GLM Chat cannot satisfy required web search without a host adapter");
+  }
   if (choice !== "auto" && choice !== "none" && !supportsToolChoice) unsupported("GLM endpoint only documents automatic tool selection");
   const messages = [];
   if (request.instructions !== undefined && request.instructions !== null) {

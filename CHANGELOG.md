@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Preserve xAI flat HTTP errors (`{ code, error: "message" }`) through streaming
+  and nonstreaming bridges, retaining the original status and redacting secrets.
+- Verify native image results and opaque reasoning remain unchanged during
+  client-tool history conversion. No automatic request retry is added.
+
 ## 0.4.1
 
 - Preserve each request's explicit conversation ID across the shared Grok,
